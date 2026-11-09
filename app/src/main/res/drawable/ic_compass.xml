@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- North needle: red half points up. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFE5484D" android:pathData="M12,2 L16,12 L8,12 Z" />
+    <path android:fillColor="#FF888888" android:pathData="M8,12 L16,12 L12,22 Z" />
+</vector>

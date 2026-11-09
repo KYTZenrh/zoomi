@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original Zoomi mark: a "Z" whose diagonal is a road with lane dashes, plus an amber
+     navigation chevron. Kept inside the 66-unit adaptive-icon safe circle.
+     Source SVG: docs/brand/zoomi-logo.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M33,40 H65 V47 L45,67 H65 V74 H33 V67 L53,47 H33 Z" />
+    <path android:strokeColor="#5B4BFF" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M56,50 L53.6,52.4 M50.6,55.4 L48.2,57.8 M45.2,60.8 L42.8,63.2" />
+    <path android:fillColor="#FFB020"
+        android:pathData="M74,33 L65,36.5 L69,38 L70.5,42 Z" />
+</vector>
