@@ -1,0 +1,14 @@
+# Local development: `docker compose up --build` then http://localhost:8090
+# Production (Oracle / your own machine): see server/README.md (adds HTTPS via Caddy).
+services:
+  pocketbase:
+    build: .
+    image: zoomi-sync:0.40.6
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090"   # localhost only; put a TLS reverse proxy in front for public use
+    volumes:
+      - pb_data:/pb/pb_data
+
+volumes:
+  pb_data:
