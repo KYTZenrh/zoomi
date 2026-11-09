@@ -86,7 +86,7 @@ fun RoutePreviewCard(
                     }
                     val sel = preview.routes[preview.selected]
                     Text("Arrive around ${Formatting.arrivalClock(System.currentTimeMillis(), sel.durationSec)} " +
-                        "· without live traffic", style = MaterialTheme.typography.bodySmall,
+                        "· without live traffic" + if (preview.offline) " · offline route" else "", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

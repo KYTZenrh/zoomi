@@ -51,6 +51,7 @@ fun SettingsScreen(
     onValhallaUrl: (String?) -> Unit,
     onPhotonUrl: (String?) -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenRegions: () -> Unit,
     onBack: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -58,6 +59,13 @@ fun SettingsScreen(
             Modifier.windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)
         ) {
             Header("Settings", onBack)
+
+            Text(
+                "Offline regions",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenRegions).padding(20.dp),
+            )
+            HorizontalDivider()
 
             Section("Map theme")
             ThemeOption(ThemeMode.LIGHT, "Light", "Always light", mode, onModeChange)

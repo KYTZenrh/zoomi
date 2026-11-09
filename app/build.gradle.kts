@@ -50,5 +50,7 @@ dependencies {
     implementation(libs.maplibre.android)
     implementation(libs.ferrostar.core)
     implementation(libs.okhttp)
+    implementation(libs.valhalla.mobile)
+    implementation(libs.valhalla.models.config)
     implementation(libs.kotlinx.serialization.json)
 }

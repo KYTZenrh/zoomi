@@ -53,6 +53,10 @@ import kotlin.math.roundToInt
 @Composable
 fun MapScreen(
     dark: Boolean,
+    tilesUrl: String,
+    online: Boolean,
+    inRegion: Boolean,
+    positionEstimated: Boolean,
     location: Location?,
     course: Float?,
     courseUp: Boolean,
@@ -114,6 +118,7 @@ fun MapScreen(
     Box(Modifier.fillMaxSize()) {
         ZoomiMap(
             dark = dark,
+            tilesUrl = tilesUrl,
             puck = puck,
             cameraMode = cameraMode,
             courseUp = courseUp,
@@ -130,6 +135,12 @@ fun MapScreen(
         )
 
         val insets = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+
+        // Connectivity / position-quality pills (shown in every state, under the top banner).
+        Column(insets.align(Alignment.CenterEnd).padding(end = 12.dp), horizontalAlignment = Alignment.End) {
+            if (!online) Pill(if (inRegion) "Offline · using downloaded region" else "Offline · no region here", null)
+            if (positionEstimated) Pill("GPS lost · position estimated", null)
+        }
 
         if (navigating != null && nav != null) {
             NavigationOverlay(

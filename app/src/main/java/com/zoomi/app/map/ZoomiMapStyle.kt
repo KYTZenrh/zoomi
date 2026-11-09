@@ -11,8 +11,12 @@ object ZoomiMapStyle {
     const val LAYER_ROAD = "road"
     const val LAYER_ROAD_TUNNEL = "road-tunnel"
 
-    private const val TILEJSON = "https://tiles.openfreemap.org/planet"
-    private const val GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf"
+    const val ONLINE_TILES = "https://tiles.openfreemap.org/planet"
+    /** Label glyphs ship inside the app (Noto Sans, OFL), so labels render offline too. */
+    private const val GLYPHS = "asset://glyphs/{fontstack}/{range}.pbf"
+
+    /** Local PMTiles file of a downloaded region (MapLibre Android >= 11.7). */
+    fun localTiles(path: String) = "pmtiles://file://$path"
 
     const val ATTRIBUTION =
         "<a href=\\\"https://openfreemap.org\\\">OpenFreeMap</a> " +
@@ -70,12 +74,12 @@ object ZoomiMapStyle {
     private const val CAR_ROADS =
         """["match",["get","class"],["motorway","trunk","primary","secondary","tertiary","minor","service"],true,false]"""
 
-    fun json(p: Palette): String = """
+    fun json(p: Palette, tilesUrl: String = ONLINE_TILES): String = """
 {
   "version": 8,
   "name": "Zoomi",
   "sources": {
-    "$SOURCE": { "type": "vector", "url": "$TILEJSON", "attribution": "$ATTRIBUTION" }
+    "$SOURCE": { "type": "vector", "url": "$tilesUrl", "attribution": "$ATTRIBUTION" }
   },
   "glyphs": "$GLYPHS",
   "layers": [

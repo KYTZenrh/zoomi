@@ -25,16 +25,19 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zoomi.app.ui.AboutScreen
 import com.zoomi.app.ui.MapScreen
+import com.zoomi.app.ui.RegionsScreen
+import androidx.compose.runtime.remember
 import com.zoomi.app.ui.SearchScreen
 import com.zoomi.app.ui.SettingsScreen
 import com.zoomi.app.ui.ZoomiTheme
 import org.maplibre.android.MapLibre
 
-private enum class Screen { MAP, SEARCH, SETTINGS, ABOUT }
+private enum class Screen { MAP, SEARCH, SETTINGS, ABOUT, REGIONS }
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
     private val tripVm: TripViewModel by viewModels()
+    private val regionsVm: RegionsViewModel by viewModels()
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.onPermissionResult() }
@@ -42,6 +45,9 @@ class MainActivity : ComponentActivity() {
     /** Notification permission is only needed to SHOW the navigation notification; guidance works without it. */
     private val notificationLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { tripVm.startNavigation() }
+
+    private val importLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> uri?.let(regionsVm::importFrom) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +83,15 @@ class MainActivity : ComponentActivity() {
             val speedLimit by tripVm.speedLimit.collectAsStateWithLifecycle()
             val muted by tripVm.voiceMuted.collectAsStateWithLifecycle()
             var screen by rememberSaveable { mutableStateOf(Screen.MAP) }
+            val online by zoomi.network.online.collectAsStateWithLifecycle()
+            val installed by regionsVm.installed.collectAsStateWithLifecycle()
+            val estimated by vm.positionEstimated.collectAsStateWithLifecycle()
+            // Inside a downloaded region the map is drawn from the local file (works offline, saves data).
+            val mapRegion = remember(location?.latitude?.times(100)?.toInt(), location?.longitude?.times(100)?.toInt(), installed) {
+                location?.let { zoomi.regions.mapRegionAt(it.latitude, it.longitude) }
+            }
+            val tilesUrl = mapRegion?.mapFile?.let { com.zoomi.app.map.ZoomiMapStyle.localTiles(it.absolutePath) }
+                ?: com.zoomi.app.map.ZoomiMapStyle.ONLINE_TILES
 
             LaunchedEffect(Unit) { if (!vm.gnss.hasPermission()) requestLocation() }
 
@@ -91,6 +106,10 @@ class MainActivity : ComponentActivity() {
                 // The map stays composed underneath so it isn't recreated when coming back.
                 MapScreen(
                     dark = dark,
+                    tilesUrl = tilesUrl,
+                    online = online,
+                    inRegion = mapRegion != null,
+                    positionEstimated = estimated,
                     location = location,
                     course = course,
                     courseUp = courseUp,
@@ -145,7 +164,31 @@ class MainActivity : ComponentActivity() {
                             onValhallaUrl = vm::setValhallaUrl,
                             onPhotonUrl = vm::setPhotonUrl,
                             onOpenAbout = { screen = Screen.ABOUT },
+                            onOpenRegions = { screen = Screen.REGIONS },
                             onBack = { screen = Screen.MAP },
+                        )
+                    }
+                    Screen.REGIONS -> {
+                        BackHandler { screen = Screen.SETTINGS }
+                        val catalogUrl by regionsVm.catalogUrl.collectAsStateWithLifecycle()
+                        val catalog by regionsVm.catalog.collectAsStateWithLifecycle()
+                        val progress by regionsVm.progress.collectAsStateWithLifecycle()
+                        val importState by regionsVm.importState.collectAsStateWithLifecycle()
+                        RegionsScreen(
+                            installed = installed,
+                            catalogUrl = catalogUrl,
+                            catalog = catalog,
+                            progress = progress,
+                            import = importState,
+                            onImport = { importLauncher.launch(null) },
+                            onCancelImport = regionsVm::cancelImport,
+                            onCatalogUrl = regionsVm::setCatalogUrl,
+                            onLoadCatalog = regionsVm::loadCatalog,
+                            onDownload = regionsVm::download,
+                            onCancel = regionsVm::cancel,
+                            onDelete = regionsVm::delete,
+                            onRescan = regionsVm::rescan,
+                            onBack = { screen = Screen.SETTINGS },
                         )
                     }
                     Screen.ABOUT -> {

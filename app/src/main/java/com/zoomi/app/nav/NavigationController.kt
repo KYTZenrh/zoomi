@@ -10,15 +10,13 @@ import com.stadiamaps.ferrostar.core.annotation.valhalla.valhallaExtendedOSRMAnn
 import com.stadiamaps.ferrostar.core.http.OkHttpClientProvider
 import com.stadiamaps.ferrostar.core.location.toUserLocation
 import com.stadiamaps.ferrostar.core.service.FerrostarForegroundServiceManager
-import com.zoomi.app.location.GnssLocationSource
+import com.zoomi.app.data.SettingsRepository
+import com.zoomi.app.location.PositionEngine
+import com.zoomi.app.net.NetworkMonitor
 import com.zoomi.app.net.ZoomiHttp
+import com.zoomi.app.regions.RegionStore
 import com.zoomi.core.nav.ValhallaLocale
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import uniffi.ferrostar.CourseFiltering
@@ -29,33 +27,47 @@ import uniffi.ferrostar.RouteDeviationTracking
 import uniffi.ferrostar.Waypoint
 import uniffi.ferrostar.WaypointAdvanceMode
 import uniffi.ferrostar.WaypointKind
-import uniffi.ferrostar.WellKnownRouteProvider
 import uniffi.ferrostar.stepAdvanceDistanceEntryAndExit
 import uniffi.ferrostar.stepAdvanceDistanceToEndOfStep
 import java.util.Locale
+import kotlin.time.Duration.Companion.seconds
 
 /** Speed limit for the current road, when OSM has it. */
 data class SpeedLimit(val value: Int, val unit: String)
 
 /**
- * Owns the Ferrostar navigation core: route requests (Valhalla), step tracking,
- * off-route detection with automatic reroute, voice (Android TTS), and the
- * foreground service that keeps guidance running with the screen off.
+ * Owns the Ferrostar navigation core: route requests (online or on-device Valhalla), step
+ * tracking, off-route detection with automatic reroute, voice (Android TTS), and the foreground
+ * service that keeps guidance running with the screen off.
  */
-class NavigationController(context: Context, private val gnss: GnssLocationSource) {
+class NavigationController(
+    context: Context,
+    position: PositionEngine,
+    regions: RegionStore,
+    network: NetworkMonitor,
+) {
     private val appContext = context.applicationContext
     private val tts = AndroidTtsObserver(appContext).also { it.start() }
     private val annotations = valhallaExtendedOSRMAnnotationPublisher()
     private val foreground = FerrostarForegroundServiceManager(appContext, ZoomiNotificationBuilder(appContext))
 
-    private val coreFlow = MutableStateFlow<FerrostarCore?>(null)
-    private var coreUrl: String? = null
-
-    /** Live navigation state of whichever core is active. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val state: Flow<NavigationState> = coreFlow.flatMapLatest { it?.state ?: flowOf(NavigationState()) }
+    /** Updated from settings. */
+    @Volatile var valhallaUrl: String = SettingsRepository.DEFAULT_VALHALLA
 
     val language: String get() = ValhallaLocale.pick(Locale.getDefault().toLanguageTag())
+
+    val routeProvider = HybridRouteProvider(
+        appContext, regions,
+        valhallaUrl = { valhallaUrl },
+        optionsJson = {
+            buildJsonObject {
+                put("alternates", 2)
+                put("units", "kilometers")
+                put("language", language)
+            }.toString()
+        },
+        isOnline = { network.online.value },
+    )
 
     private val config = NavigationControllerConfig(
         WaypointAdvanceMode.WaypointWithinRange(100.0),
@@ -65,41 +77,27 @@ class NavigationController(context: Context, private val gnss: GnssLocationSourc
         CourseFiltering.SNAP_TO_ROUTE,
     )
 
-    /** Builds (or reuses) the core for the configured Valhalla endpoint. */
-    private fun coreFor(valhallaUrl: String): FerrostarCore {
-        coreFlow.value?.let { if (coreUrl == valhallaUrl) return it }
-        val options = buildJsonObject {
-            put("alternates", 2)
-            put("units", "kilometers")
-            put("language", language)
-        }.toString()
-        val c = FerrostarCore(
-            WellKnownRouteProvider.Valhalla(valhallaUrl, "auto", options),
-            OkHttpClientProvider(ZoomiHttp.client),
-            GnssNavigationLocationProvider(gnss),
-            config,
-            foreground,
-        )
-        // Defaults: on deviation, fetch new routes and switch to the first automatically.
-        c.minimumTimeBeforeRecalculation = 5.seconds
-        c.spokenInstructionObserver = tts
-        coreUrl = valhallaUrl
-        coreFlow.value = c
-        return c
+    private val core = FerrostarCore(
+        routeProvider,
+        OkHttpClientProvider(ZoomiHttp.client),
+        GnssNavigationLocationProvider(position),
+        config,
+        foreground,
+    ).apply {
+        // Defaults kept: on deviation, fetch new routes and switch to the first automatically.
+        minimumTimeBeforeRecalculation = 5.seconds
+        spokenInstructionObserver = tts
     }
 
-    suspend fun routes(valhallaUrl: String, from: Location, toLat: Double, toLon: Double): List<Route> =
-        coreFor(valhallaUrl).getRoutes(
-            from.toUserLocation(),
-            listOf(Waypoint(GeographicCoordinate(toLat, toLon), WaypointKind.BREAK)),
-        )
+    val state: StateFlow<NavigationState> = core.state
 
-    fun start(valhallaUrl: String, route: Route) {
-        coreFor(valhallaUrl).startNavigation(route, config)
-    }
+    suspend fun routes(from: Location, toLat: Double, toLon: Double): List<Route> =
+        core.getRoutes(from.toUserLocation(), listOf(Waypoint(GeographicCoordinate(toLat, toLon), WaypointKind.BREAK)))
+
+    fun start(route: Route) = core.startNavigation(route, config)
 
     fun stop() {
-        coreFlow.value?.stopNavigation()
+        core.stopNavigation()
         tts.stopAndClearQueue()
     }
 

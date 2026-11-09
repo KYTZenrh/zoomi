@@ -28,6 +28,7 @@ class SettingsRepository(private val context: Context) {
     private val photonKey = stringPreferencesKey("photon_url")
     private val voiceMutedKey = booleanPreferencesKey("voice_muted")
     private val placesKey = stringPreferencesKey("saved_places")
+    private val catalogKey = stringPreferencesKey("region_catalog_url")
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO
@@ -36,6 +37,7 @@ class SettingsRepository(private val context: Context) {
     val valhallaUrl: Flow<String> = context.dataStore.data.map { it[valhallaKey] ?: DEFAULT_VALHALLA }
     val photonUrl: Flow<String> = context.dataStore.data.map { it[photonKey] ?: DEFAULT_PHOTON }
     val voiceMuted: Flow<Boolean> = context.dataStore.data.map { it[voiceMutedKey] ?: false }
+    val catalogUrl: Flow<String> = context.dataStore.data.map { it[catalogKey] ?: "" }
     val savedPlaces: Flow<List<SavedPlace>> = context.dataStore.data.map { SavedPlaces.decode(it[placesKey]) }
 
     suspend fun setThemeMode(mode: ThemeMode) = context.dataStore.edit { it[themeKey] = mode.name }
@@ -45,6 +47,9 @@ class SettingsRepository(private val context: Context) {
     }
     suspend fun setPhotonUrl(url: String?) = context.dataStore.edit {
         if (url.isNullOrBlank()) it.remove(photonKey) else it[photonKey] = url.trim()
+    }
+    suspend fun setCatalogUrl(url: String) = context.dataStore.edit {
+        if (url.isBlank()) it.remove(catalogKey) else it[catalogKey] = url.trim()
     }
     suspend fun setVoiceMuted(value: Boolean) = context.dataStore.edit { it[voiceMutedKey] = value }
 

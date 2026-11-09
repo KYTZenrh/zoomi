@@ -2,10 +2,28 @@
 
 Free, open-source navigation for Android. No ads, no tracking, no Google Play Services.
 
-**Status: milestone (b), online car routing with turn-by-turn.** Offline regions, other travel modes,
+**Status: milestone (c), offline regions, offline routing and heading fix.** Other travel modes,
 accounts, alerts and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
 
 ## What works now
+
+### Milestone (c): offline + heading
+- **Offline regions** (Settings → Offline regions): map (PMTiles) + routing network (Valhalla tile extract) per region.
+  Download from a catalog URL (resumable, SHA-256 verified) or "Import region folder…" (pick a folder, e.g. in Downloads,
+  with Android's folder picker; files are copied and verified). Copying straight into `Android/data/…` doesn't work on
+  Android 11+: the app can't read folders created there by other users (found on the S24 Ultra). Inside a region the map always comes
+  from the phone. Map labels use fonts bundled in the app.
+- **Offline routing / rerouting**: the same request goes to the online server when connected, or to Valhalla running
+  on the phone (valhalla-mobile) when offline or when the server is unreachable. Losing signal mid-trip keeps guidance
+  running, and reroutes are computed on the phone inside a downloaded region. The preview says "offline route".
+- **Heading without a compass**: GNSS course when moving (≥ 2.5 m/s, accurate course); when slow or stopped, the gyroscope's
+  rotation around the gravity axis (works with any phone mount) from the last good course. A deadband stops drift while parked.
+  The magnetometer is not used at all, because the car's metal and mount magnets make it unreliable.
+  If uncertainty grows past 60°, the arrow is replaced by a dot rather than showing a possibly wrong direction.
+- **Dead reckoning** in tunnels / GPS dropouts while navigating: the position keeps moving along the route at the last
+  speed (max 120 s / 4 km), shown as "GPS lost · position estimated", with a growing accuracy radius so it never
+  triggers a false off-route reroute. Instructions keep advancing.
+- Status pills: "Offline · using downloaded region" / "Offline · no region here".
 
 ### Milestone (b): search and car navigation (online)
 - Search with autocomplete (Photon). Starts after 3 letters, waits 400 ms after typing stops, max 1 request/s.
@@ -73,6 +91,10 @@ Install on a phone with USB debugging enabled: `adb install -r app/build/outputs
 | Photon on photon.komoot.io (komoot) | search, reverse geocoding | Photon Apache-2.0; public server "fair use, heavy use throttled" |
 | Ferrostar (Stadia Maps) | navigation logic, TTS, foreground service | BSD 3-Clause |
 | OkHttp | HTTP | Apache-2.0 |
+| valhalla-mobile (Rallista) 0.6.4 / Valhalla 3.9.1 | on-device routing | MIT |
+| Planetiler 0.10.2 (OpenMapTiles profile) | building offline map files | Apache-2.0 (tool); output ODbL |
+| Natural Earth | low-zoom map data in offline files | public domain |
+| Noto Sans glyphs (bundled) | map labels | SIL Open Font License 1.1 (`app/src/main/assets/glyphs/OFL.txt`) |
 
 Attribution is visible on the map (bottom-left "© OpenStreetMap") and in Settings → About.
 
@@ -93,8 +115,17 @@ This section will be updated, before release, for every milestone that adds a ne
 
 ## Known limitations
 
-- Needs internet: no offline maps or offline routing yet (milestone c). If the connection drops mid-trip, guidance
-  continues on the current route, but rerouting fails until the connection returns.
+- Zoomi doesn't host region files yet (needs a public host; planned with the first release / server milestone).
+  Today: build them with `data-pipeline/`, copy the folder to the phone (e.g. Downloads) and import it, or point the app at
+  your own catalog URL.
+- The first Romania map build has **no open-sea polygons** (osmdata.openstreetmap.de was unreachable); the Black Sea
+  shows as land colour in offline mode. Lakes and rivers are fine. Will be rebuilt.
+- Search needs internet (no offline address search yet).
+- Dead reckoning needs a route (navigation active); outside navigation the dot simply stays put during GPS loss.
+  It assumes constant speed, so in a long tunnel with traffic the estimate runs ahead or behind until GPS returns.
+- Gyro heading drifts a few degrees per minute while turning slowly without GPS; it resets on the next good GPS course.
+- Debug APK is ~133 MB (native map, Ferrostar and Valhalla engines for 4 CPU types).
+
 - Car only. Bike, walking, public transport and the "no road route / water crossing" dialog come in milestone (d).
 - ETAs don't include live traffic (milestone g), so rush-hour estimates will be optimistic.
 - Default servers are community-run with strict limits (1 req/s). Fine for personal use and testing; a public release

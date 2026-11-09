@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased] 0.3.0-c, milestone (c)
+
+### Added
+- Offline regions: install from a catalog (resumable download, SHA-256 check) or import a folder via the system folder
+  picker (copy + SHA-256 check); delete.
+- Map uses the local PMTiles file inside a downloaded region; label glyphs bundled in the app (Noto Sans, OFL).
+- Hybrid routing: online Valhalla when connected, on-device Valhalla (valhalla-mobile 0.6.4 / Valhalla 3.9.1) when offline or
+  the server is unreachable. Same request format and parser for both; used for reroutes too.
+- Heading fusion: GNSS course + gyroscope yaw around gravity (mount-independent), no magnetometer, uncertainty-based withdrawal.
+- Dead reckoning along the route during GPS loss while navigating (time/distance capped, accuracy grows).
+- Offline / estimated-position status pills; "offline route" note in the route preview.
+- `data-pipeline/`: build + package scripts and instructions (Planetiler 0.10.2, Valhalla 3.9.1).
+- Unit tests: heading fusion, yaw-rate projection, dead reckoning, polyline projection, region manifests (62 total).
+
+### Fixed (found on device)
+- adb-pushed region folders in Android/data were unreadable by the app (Android 11+ storage rules): replaced with folder import.
+- Network monitor reported "online" in airplane mode (re-read activeNetwork in onLost); now tracks validated networks per callback.
+
 ## [Unreleased] 0.2.0-b, milestone (b)
 
 ### Added

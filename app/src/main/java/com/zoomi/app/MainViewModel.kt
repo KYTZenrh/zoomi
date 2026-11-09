@@ -5,7 +5,9 @@ import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.zoomi.app.sensors.LightSensorSource
-import com.zoomi.core.location.CourseTracker
+import com.zoomi.core.location.HeadingFusion
+import com.zoomi.app.sensors.YawRateSource
+import com.zoomi.app.location.PositionEngine
 import com.zoomi.core.theme.AutoThemeController
 import com.zoomi.core.theme.SolarCalculator
 import com.zoomi.core.theme.ThemeDecision
@@ -34,14 +36,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val gnss = app.zoomi.gnss
     private val light = LightSensorSource(app)
     private val controller = AutoThemeController()
-    private val courseTracker = CourseTracker()
+    private val fusion = HeadingFusion()
+    private val yaw = YawRateSource(app) { t, rate -> onYaw(t, rate) }
+    private val engine = app.zoomi.position
 
     val themeMode: StateFlow<ThemeMode> =
         settings.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.AUTO)
     val courseUp: StateFlow<Boolean> =
         settings.courseUp.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    val location: StateFlow<Location?> = gnss.location
+    /** Position for the map: real GPS, or dead-reckoned along the route in tunnels. */
+    val location: StateFlow<Location?> = engine.position
+    val positionEstimated: StateFlow<Boolean> = engine.estimated
     val gpsEnabled: StateFlow<Boolean> = gnss.providerEnabled
 
     private val _course = MutableStateFlow<Float?>(null)
@@ -63,13 +69,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            gnss.location.collect { loc ->
+            engine.position.collect { loc ->
                 if (loc != null) {
-                    _course.value = courseTracker.update(
-                        if (loc.hasSpeed()) loc.speed else null,
-                        if (loc.hasBearing()) loc.bearing else null,
-                        if (loc.hasBearingAccuracy()) loc.bearingAccuracyDegrees else null,
-                    )
+                    if (loc.provider == PositionEngine.PROVIDER_DR) {
+                        _course.value = loc.bearing // follow the road while dead reckoning
+                    } else {
+                        _course.value = fusion.onGnss(
+                            if (loc.hasSpeed()) loc.speed else null,
+                            if (loc.hasBearing()) loc.bearing else null,
+                            if (loc.hasBearingAccuracy()) loc.bearingAccuracyDegrees else null,
+                        ).degrees
+                    }
                 }
                 evaluateTheme()
             }
@@ -110,6 +120,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    private fun onYaw(timeMs: Long, rate: Float) {
+        if (engine.estimated.value) return
+        val d = fusion.onGyro(timeMs, rate).degrees
+        val cur = _course.value
+        // Avoid recomposing 50x/s: publish only meaningful changes.
+        if (d == null || cur == null || angleDiff(d, cur) >= 1f) _course.value = d
+    }
+
+    private fun angleDiff(a: Float, b: Float): Float { val d = kotlin.math.abs(a - b) % 360f; return if (d > 180f) 360f - d else d }
+
     fun onPermissionResult() {
         _hasPermission.value = gnss.hasPermission()
         if (_hasPermission.value) gnss.start()
@@ -119,11 +139,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _hasPermission.value = gnss.hasPermission()
         gnss.start()
         light.start()
+        yaw.start()
     }
 
     /** @param keepGps true while navigating: guidance continues in the background via the foreground service. */
     fun onStop(keepGps: Boolean) {
-        if (!keepGps) gnss.stop()
+        if (!keepGps) { gnss.stop(); yaw.stop() }
         light.stop()
     }
 

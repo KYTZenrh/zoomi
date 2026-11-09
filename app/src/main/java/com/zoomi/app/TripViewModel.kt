@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uniffi.ferrostar.Route
@@ -38,6 +39,8 @@ sealed interface TripUi {
         val routes: List<RouteOption> = emptyList(),
         val selected: Int = 0,
         val error: String? = null,
+        /** Computed on the phone from a downloaded region (no connection or server unreachable). */
+        val offline: Boolean = false,
     ) : TripUi
     data class Navigating(val destination: Place) : TripUi
     data class Arrived(val destination: Place) : TripUi
@@ -76,8 +79,17 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch { z.settings.photonUrl.collect { z.photonUrl = it } }
+        viewModelScope.launch { z.settings.valhallaUrl.collect { nav.valhallaUrl = it } }
+        viewModelScope.launch { z.regions.refresh() }
         viewModelScope.launch { voiceMuted.collect { nav.setMuted(it) } }
         viewModelScope.launch { runSearch() }
+        // Give the dead reckoner the active route (or none).
+        viewModelScope.launch {
+            navState
+                .map { s -> if (s.routeGeometry.size >= 2) s.routeGeometry else null }
+                .distinctUntilChanged() // only when a new route arrives (start / reroute)
+                .collect { g -> z.position.setRoute(g?.map { com.zoomi.core.location.LatLon(it.lat, it.lng) }) }
+        }
         viewModelScope.launch {
             navState.collect { s ->
                 _speedLimit.value = nav.speedLimit(s)
@@ -153,17 +165,18 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             try {
-                val url = z.settings.valhallaUrl.first()
-                val routes = nav.routes(url, from, p.destination.lat, p.destination.lon).map {
+                val routes = nav.routes(from, p.destination.lat, p.destination.lon).map {
                     RouteOption(it, it.steps.sumOf { s -> s.duration }, it.distance)
                 }
                 update {
                     if (routes.isEmpty()) it.copy(loading = false, error = "No route found.")
-                    else it.copy(loading = false, routes = routes, selected = 0)
+                    else it.copy(loading = false, routes = routes, selected = 0,
+                        offline = nav.routeProvider.lastSource.value == com.zoomi.app.nav.RouteSource.OFFLINE)
                 }
             } catch (e: Exception) {
                 Log.w("Zoomi", "route failed", e)
-                update { it.copy(loading = false, error = "Couldn't get a route: ${e.message ?: e::class.simpleName}") }
+                val msg = if (e is com.zoomi.app.nav.RoutingException) e.message else "Couldn't get a route: ${e.message ?: e::class.simpleName}"
+                update { it.copy(loading = false, error = msg) }
             }
         }
     }
@@ -178,14 +191,13 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
     fun startNavigation() {
         val p = _trip.value as? TripUi.Preview ?: return
         val option = p.routes.getOrNull(p.selected) ?: return
-        viewModelScope.launch {
-            nav.start(z.settings.valhallaUrl.first(), option.route)
-            _trip.value = TripUi.Navigating(p.destination)
-        }
+        nav.start(option.route)
+        _trip.value = TripUi.Navigating(p.destination)
     }
 
     fun endTrip() {
         routeJob?.cancel()
+        z.position.setRoute(null)
         if (_trip.value is TripUi.Navigating) nav.stop()
         _trip.value = TripUi.Idle
     }

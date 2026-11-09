@@ -1,0 +1,24 @@
+{
+ "id": "romania",
+ "name": "Romania",
+ "bbox": [
+  20.24181,
+  43.61247,
+  30.27896,
+  48.26948
+ ],
+ "osmDate": "2026-11-09",
+ "valhallaVersion": "3.9.1",
+ "files": [
+  {
+   "name": "map.pmtiles",
+   "size": 455527617,
+   "sha256": "d92f6cb3e6b18b27da15eb645fb5c821fe181081343fee568692bcee9a220af4"
+  },
+  {
+   "name": "routing.tar",
+   "size": 402585600,
+   "sha256": "bea920f9b6fd4afb2cc3ff4fea65abbed521fee9f8de8efd77558c4823229d17"
+  }
+ ]
+}
