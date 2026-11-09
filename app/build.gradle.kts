@@ -11,8 +11,8 @@ android {
         applicationId = "com.zoomi.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-a"
+        versionCode = 2
+        versionName = "0.2.0-b"
     }
 
     buildTypes {
@@ -25,12 +25,17 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true // required by Ferrostar
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(project(":core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -43,4 +48,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.maplibre.android)
+    implementation(libs.ferrostar.core)
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
 }

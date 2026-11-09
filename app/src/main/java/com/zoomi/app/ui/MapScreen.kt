@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -16,10 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,11 +33,21 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.stadiamaps.ferrostar.core.NavigationState
 import com.zoomi.app.R
+import com.zoomi.app.TripUi
+import com.zoomi.app.map.CameraMode
+import com.zoomi.app.map.Puck
 import com.zoomi.app.map.ZoomiMap
+import com.zoomi.app.nav.SpeedLimit
+import com.zoomi.core.places.PlaceKind
+import com.zoomi.core.search.Place
+import org.maplibre.android.geometry.LatLng
+import uniffi.ferrostar.TripState
 import kotlin.math.roundToInt
 
 @Composable
@@ -45,38 +58,117 @@ fun MapScreen(
     courseUp: Boolean,
     gpsEnabled: Boolean,
     hasPermission: Boolean,
+    trip: TripUi,
+    navState: NavigationState,
+    speedLimit: SpeedLimit?,
+    voiceMuted: Boolean,
     onRequestPermission: () -> Unit,
     onToggleCourseUp: () -> Unit,
     onTunnelRoad: (Boolean?) -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
+    onLongPress: (Double, Double) -> Unit,
+    onSelectRoute: (Int) -> Unit,
+    onStart: () -> Unit,
+    onRetry: () -> Unit,
+    onSavePlace: (Place, PlaceKind, String) -> Unit,
+    onCloseTrip: () -> Unit,
+    onToggleMute: () -> Unit,
+    onShareEta: () -> Unit,
 ) {
-    var follow by rememberSaveable { mutableStateOf(true) }
+    var userPanned by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val navigating = trip as? TripUi.Navigating
+    val nav = navState.tripState as? TripState.Navigating
+
+    // Reset free-pan when the trip state changes (e.g. preview -> navigation).
+    LaunchedEffect(trip::class) { userPanned = false }
+
+    val cameraMode = when {
+        userPanned -> CameraMode.FREE
+        trip is TripUi.Preview -> CameraMode.OVERVIEW
+        navigating != null -> CameraMode.NAVIGATE
+        else -> CameraMode.FOLLOW
+    }
+
+    // While navigating, draw the vehicle snapped to the route with the route's course.
+    val puck = if (navigating != null && nav != null) {
+        val s = nav.snappedUserLocation
+        Puck(s.coordinates.lat, s.coordinates.lng, s.courseOverGround?.degrees?.toFloat() ?: course)
+    } else location?.let { Puck(it.latitude, it.longitude, course) }
+
+    val routes: List<List<LatLng>> = when (trip) {
+        is TripUi.Preview -> trip.routes.map { r -> r.route.geometry.map { LatLng(it.lat, it.lng) } }
+        is TripUi.Navigating -> listOf(navState.routeGeometry.map { LatLng(it.lat, it.lng) })
+        else -> emptyList()
+    }
+    val selected = (trip as? TripUi.Preview)?.selected ?: 0
+    val destination = when (trip) {
+        is TripUi.Preview -> LatLng(trip.destination.lat, trip.destination.lon)
+        is TripUi.Navigating -> LatLng(trip.destination.lat, trip.destination.lon)
+        else -> null
+    }
+    val bottomPadPx = with(LocalDensity.current) { 300.dp.roundToPx() }
 
     Box(Modifier.fillMaxSize()) {
         ZoomiMap(
             dark = dark,
-            location = location,
-            course = course,
-            follow = follow,
+            puck = puck,
+            cameraMode = cameraMode,
             courseUp = courseUp,
+            routes = routes,
+            selectedRoute = selected,
+            destination = destination,
             brandColor = MaterialTheme.colorScheme.primary.toArgb(),
-            onUserPanned = { follow = false },
+            overviewPaddingBottomPx = bottomPadPx,
+            onUserPanned = { userPanned = true },
             onTunnelRoad = onTunnelRoad,
+            onLongPress = { if (navigating == null) onLongPress(it.latitude, it.longitude) },
+            onRouteTap = onSelectRoute,
             modifier = Modifier.fillMaxSize(),
         )
 
         val insets = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
 
-        // Top: one status pill. Only shown when something needs attention, to keep the map clean.
-        val status: String? = when {
-            !hasPermission -> null
-            !gpsEnabled -> "Location is off"
-            location == null -> "Searching for GPS…"
-            else -> null
+        if (navigating != null && nav != null) {
+            NavigationOverlay(
+                trip = nav,
+                rerouting = navState.isCalculatingNewRoute,
+                speedLimit = speedLimit,
+                currentSpeedKmh = location?.takeIf { it.hasSpeed() }?.let { mpsToKmh(it.speed) },
+                muted = voiceMuted,
+                onToggleMute = onToggleMute,
+                onShareEta = onShareEta,
+                onEnd = onCloseTrip,
+            )
+            if (userPanned) {
+                RoundButton(R.drawable.ic_locate, "Back to navigation", highlighted = true,
+                    modifier = insets.align(Alignment.CenterEnd).padding(end = 16.dp), onClick = { userPanned = false })
+            }
+            return@Box
         }
-        Column(insets.align(Alignment.TopCenter).padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+
+        // Top: search bar (idle) + status pills.
+        Column(insets.align(Alignment.TopCenter).padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (trip is TripUi.Idle && hasPermission) {
+                Surface(
+                    onClick = onOpenSearch,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    shadowElevation = 8.dp,
+                ) {
+                    Text("Where to?", style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 16.dp))
+                }
+            }
+            val status: String? = when {
+                !hasPermission -> null
+                !gpsEnabled -> "Location is off"
+                location == null -> "Searching for GPS…"
+                else -> null
+            }
             if (status != null) {
                 Pill(status, onClick = if (!gpsEnabled) {
                     { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
@@ -96,8 +188,8 @@ fun MapScreen(
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Zoomi needs precise location", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Your position comes from the phone's GPS chip and never leaves the device. " +
-                            "Without it Zoomi can show the map but can't follow you.",
+                        "Your position comes from the phone's GPS chip. It stays on the device, except the " +
+                            "start point of a route you request, which is sent to the routing server.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Button(onClick = onRequestPermission) { Text("Allow location") }
@@ -105,39 +197,51 @@ fun MapScreen(
             }
         }
 
-        // Right side: big round buttons, reachable with a thumb.
-        Column(
-            insets.align(Alignment.BottomEnd).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            horizontalAlignment = Alignment.End,
-        ) {
-            RoundButton(
-                icon = R.drawable.ic_compass,
-                label = if (courseUp) "Heading up (tap for north up)" else "North up (tap for heading up)",
-                rotation = if (courseUp) -(course ?: 0f) else 0f,
-                onClick = onToggleCourseUp,
+        when (trip) {
+            is TripUi.Preview -> RoutePreviewCard(
+                preview = trip,
+                onSelect = onSelectRoute,
+                onStart = onStart,
+                onRetry = onRetry,
+                onSave = onSavePlace,
+                onClose = onCloseTrip,
+                modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing),
             )
-            RoundButton(R.drawable.ic_settings, "Settings", onClick = onOpenSettings)
-            if (!follow) {
-                RoundButton(R.drawable.ic_locate, "Follow my position", highlighted = true, onClick = { follow = true })
+            is TripUi.Arrived -> ArrivedCard(trip.destination.title, onDone = onCloseTrip,
+                modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing))
+            else -> {
+                Column(
+                    insets.align(Alignment.BottomEnd).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    RoundButton(
+                        icon = R.drawable.ic_compass,
+                        label = if (courseUp) "Heading up (tap for north up)" else "North up (tap for heading up)",
+                        rotation = if (courseUp) -(course ?: 0f) else 0f,
+                        onClick = onToggleCourseUp,
+                    )
+                    RoundButton(R.drawable.ic_settings, "Settings", onClick = onOpenSettings)
+                    if (userPanned) {
+                        RoundButton(R.drawable.ic_locate, "Follow my position", highlighted = true, onClick = { userPanned = false })
+                    }
+                }
+                Surface(
+                    modifier = insets.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(6.dp),
+                    onClick = onOpenAbout,
+                ) {
+                    Text("© OpenStreetMap", fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                }
             }
-        }
-
-        // Required OpenStreetMap attribution, always visible; tap for full credits.
-        Surface(
-            modifier = insets.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 8.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-            shape = RoundedCornerShape(6.dp),
-            onClick = onOpenAbout,
-        ) {
-            Text("© OpenStreetMap", fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
         }
     }
 }
 
 @Composable
 private fun Pill(text: String, onClick: (() -> Unit)?) {
-    val mod = Modifier.padding(bottom = 6.dp)
+    val mod = Modifier.padding(top = 8.dp)
     val content: @Composable () -> Unit = {
         Text(text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
     }
@@ -150,16 +254,17 @@ private fun Pill(text: String, onClick: (() -> Unit)?) {
 }
 
 @Composable
-private fun RoundButton(
+internal fun RoundButton(
     icon: Int,
     label: String,
+    modifier: Modifier = Modifier,
     rotation: Float = 0f,
     highlighted: Boolean = false,
     onClick: () -> Unit,
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(60.dp),
+        modifier = modifier.size(60.dp),
         shape = CircleShape,
         shadowElevation = 6.dp,
         color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
@@ -169,7 +274,7 @@ private fun RoundButton(
             Icon(
                 painterResource(icon), contentDescription = label,
                 modifier = Modifier.size(28.dp).rotate(rotation),
-                tint = if (icon == R.drawable.ic_compass) Color.Unspecified else androidx.compose.material3.LocalContentColor.current,
+                tint = if (icon == R.drawable.ic_compass) Color.Unspecified else LocalContentColor.current,
             )
         }
     }

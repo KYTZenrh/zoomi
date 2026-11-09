@@ -1,7 +1,14 @@
 package com.zoomi.app
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -15,23 +22,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import android.graphics.Color
-import android.hardware.Sensor
-import android.hardware.SensorManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zoomi.app.ui.AboutScreen
 import com.zoomi.app.ui.MapScreen
+import com.zoomi.app.ui.SearchScreen
 import com.zoomi.app.ui.SettingsScreen
 import com.zoomi.app.ui.ZoomiTheme
 import org.maplibre.android.MapLibre
 
-private enum class Screen { MAP, SETTINGS, ABOUT }
+private enum class Screen { MAP, SEARCH, SETTINGS, ABOUT }
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
+    private val tripVm: TripViewModel by viewModels()
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.onPermissionResult() }
+
+    /** Notification permission is only needed to SHOW the navigation notification; guidance works without it. */
+    private val notificationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { tripVm.startNavigation() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,9 +67,25 @@ class MainActivity : ComponentActivity() {
             val gpsEnabled by vm.gpsEnabled.collectAsStateWithLifecycle()
             val hasPermission by vm.hasPermission.collectAsStateWithLifecycle()
             val diagnostics by vm.diagnostics.collectAsStateWithLifecycle()
+            val valhallaUrl by vm.valhallaUrl.collectAsStateWithLifecycle()
+            val photonUrl by vm.photonUrl.collectAsStateWithLifecycle()
+
+            val trip by tripVm.trip.collectAsStateWithLifecycle()
+            val search by tripVm.search.collectAsStateWithLifecycle()
+            val saved by tripVm.savedPlaces.collectAsStateWithLifecycle()
+            val navState by tripVm.navState.collectAsStateWithLifecycle()
+            val speedLimit by tripVm.speedLimit.collectAsStateWithLifecycle()
+            val muted by tripVm.voiceMuted.collectAsStateWithLifecycle()
             var screen by rememberSaveable { mutableStateOf(Screen.MAP) }
 
             LaunchedEffect(Unit) { if (!vm.gnss.hasPermission()) requestLocation() }
+
+            // Keep the screen on while navigating.
+            val navigating = trip is TripUi.Navigating
+            LaunchedEffect(navigating) {
+                if (navigating) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
 
             ZoomiTheme(dark) {
                 // The map stays composed underneath so it isn't recreated when coming back.
@@ -70,14 +96,42 @@ class MainActivity : ComponentActivity() {
                     courseUp = courseUp,
                     gpsEnabled = gpsEnabled,
                     hasPermission = hasPermission,
+                    trip = trip,
+                    navState = navState,
+                    speedLimit = speedLimit,
+                    voiceMuted = muted,
                     onRequestPermission = ::requestLocation,
                     onToggleCourseUp = { vm.setCourseUp(!courseUp) },
                     onTunnelRoad = { vm.onTunnelRoad = it },
+                    onOpenSearch = { screen = Screen.SEARCH },
                     onOpenSettings = { screen = Screen.SETTINGS },
                     onOpenAbout = { screen = Screen.ABOUT },
+                    onLongPress = { lat, lon -> tripVm.chooseMapPoint(lat, lon) },
+                    onSelectRoute = tripVm::selectRoute,
+                    onStart = ::startNavigation,
+                    onRetry = tripVm::retryRoutes,
+                    onSavePlace = { p, k, n -> tripVm.savePlace(p, k, n) },
+                    onCloseTrip = tripVm::endTrip,
+                    onToggleMute = { tripVm.setVoiceMuted(!muted) },
+                    onShareEta = ::shareEta,
                 )
+                if (navigating) BackHandler { /* don't leave navigation by accident; use End */ }
+                else if (trip !is TripUi.Idle && screen == Screen.MAP) BackHandler { tripVm.endTrip() }
+
                 when (screen) {
                     Screen.MAP -> Unit
+                    Screen.SEARCH -> {
+                        BackHandler { screen = Screen.MAP }
+                        SearchScreen(
+                            search = search,
+                            saved = saved,
+                            onQuery = tripVm::onQueryChange,
+                            onPick = { tripVm.chooseDestination(it); screen = Screen.MAP },
+                            onPickSaved = { tripVm.goTo(it); screen = Screen.MAP },
+                            onDeleteSaved = { tripVm.deletePlace(it.id) },
+                            onBack = { screen = Screen.MAP },
+                        )
+                    }
                     Screen.SETTINGS -> {
                         BackHandler { screen = Screen.MAP }
                         SettingsScreen(
@@ -85,7 +139,11 @@ class MainActivity : ComponentActivity() {
                             decision = decision,
                             diagnostics = diagnostics,
                             lightSensorAvailable = hasLightSensor,
+                            valhallaUrl = valhallaUrl,
+                            photonUrl = photonUrl,
                             onModeChange = vm::setThemeMode,
+                            onValhallaUrl = vm::setValhallaUrl,
+                            onPhotonUrl = vm::setPhotonUrl,
                             onOpenAbout = { screen = Screen.ABOUT },
                             onBack = { screen = Screen.MAP },
                         )
@@ -105,13 +163,31 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun startNavigation() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) // starts navigation in the callback
+        } else {
+            tripVm.startNavigation()
+        }
+    }
+
+    private fun shareEta() {
+        val text = tripVm.etaShareText() ?: return
+        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }, "Share ETA"))
+    }
+
     override fun onStart() {
         super.onStart()
         vm.onStart()
     }
 
     override fun onStop() {
-        vm.onStop()
+        vm.onStop(keepGps = tripVm.trip.value is TripUi.Navigating)
         super.onStop()
     }
 }

@@ -20,6 +20,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +45,11 @@ fun SettingsScreen(
     decision: ThemeDecision,
     diagnostics: ThemeDiagnostics,
     lightSensorAvailable: Boolean,
+    valhallaUrl: String,
+    photonUrl: String,
     onModeChange: (ThemeMode) -> Unit,
+    onValhallaUrl: (String?) -> Unit,
+    onPhotonUrl: (String?) -> Unit,
     onOpenAbout: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -90,6 +100,24 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
 
+            Section("Servers")
+            ServerField(
+                label = "Routing server (Valhalla /route URL)",
+                value = valhallaUrl,
+                default = com.zoomi.app.data.SettingsRepository.DEFAULT_VALHALLA,
+                note = "Default: FOSSGIS community server, run by volunteers. Max 1 request per second " +
+                    "(Zoomi enforces this). Receives the start and destination of each route you request.",
+                onSave = onValhallaUrl,
+            )
+            ServerField(
+                label = "Search server (Photon base URL)",
+                value = photonUrl,
+                default = com.zoomi.app.data.SettingsRepository.DEFAULT_PHOTON,
+                note = "Default: komoot's public Photon server (fair use). Receives what you type " +
+                    "and your position rounded to about 1 km.",
+                onSave = onPhotonUrl,
+            )
+
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text(
                 "About & attributions",
@@ -128,6 +156,23 @@ private fun ThemeOption(value: ThemeMode, title: String, subtitle: String, curre
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ServerField(label: String, value: String, default: String, note: String, onSave: (String?) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    val valid = text.startsWith("https://") || text.startsWith("http://")
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(
+            value = text, onValueChange = { text = it }, label = { Text(label) }, singleLine = true,
+            isError = !valid, modifier = Modifier.fillMaxWidth(),
+        )
+        Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { onSave(text) }, enabled = valid && text != value) { Text("Save") }
+            TextButton(onClick = { text = default; onSave(null) }, enabled = value != default) { Text("Reset to default") }
         }
     }
 }

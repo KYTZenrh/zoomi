@@ -2,10 +2,25 @@
 
 Free, open-source navigation for Android. No ads, no tracking, no Google Play Services.
 
-**Status: milestone (a), map + GPS location + Light/Dark/Auto theme.** Routing, offline regions,
-alerts and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
+**Status: milestone (b), online car routing with turn-by-turn.** Offline regions, other travel modes,
+accounts, alerts and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
 
-## What works now (milestone a)
+## What works now
+
+### Milestone (b): search and car navigation (online)
+- Search with autocomplete (Photon). Starts after 3 letters, waits 400 ms after typing stops, max 1 request/s.
+  Results show the place type (Museum, Bus stop, …). Long-press the map to route to any point (reverse geocoded).
+- Car routes from Valhalla with up to 2 alternatives (tap a grey route or a chip to pick it), duration, distance, arrival time.
+  ETAs are **without live traffic**.
+- Turn-by-turn via Ferrostar: big maneuver banner, lane arrows where OSM has `turn:lanes`, voice (Android TTS, phone language;
+  Valhalla supports Romanian), speed-limit sign where OSM has `maxspeed`, current speed, automatic reroute when off route
+  (at most one new route every 5 s), arrival screen.
+- Keeps working with the screen off (location foreground service + ongoing notification with an End action).
+- Saved places: one Home, one Work, any number of favourites (stored on the phone only).
+- Share ETA: Android share sheet with destination, arrival time and an OpenStreetMap link. Never your current position.
+- Settings: routing and search server URLs are editable (point them at your own server any time).
+
+### Milestone (a): map, location, theme
 
 - Vector map (OpenStreetMap data via OpenFreeMap) with Zoomi's own driving-focused style, light and dark.
 - Position from the **GPS chip only** (`LocationManager.GPS_PROVIDER`). No network positioning, works without internet.
@@ -54,23 +69,39 @@ Install on a phone with USB debugging enabled: `adb install -r app/build/outputs
 | OpenFreeMap (tiles.openfreemap.org) | online tiles and fonts | free public instance, no key; donations fund it |
 | MapLibre Native | rendering | BSD 2-Clause |
 | NOAA solar equations | sunrise/sunset | public-domain algorithm, implemented in `core/` |
+| Valhalla on valhalla1.openstreetmap.de (FOSSGIS e.V.) | car routes, instructions | Valhalla MIT; server terms: max 1 req/s, identifying User-Agent, attribution + fixthemap link |
+| Photon on photon.komoot.io (komoot) | search, reverse geocoding | Photon Apache-2.0; public server "fair use, heavy use throttled" |
+| Ferrostar (Stadia Maps) | navigation logic, TTS, foreground service | BSD 3-Clause |
+| OkHttp | HTTP | Apache-2.0 |
 
 Attribution is visible on the map (bottom-left "© OpenStreetMap") and in Settings → About.
 
 ## Privacy policy (current build)
 
 - Zoomi collects **no** personal data, has no analytics, no crash reporting, no ads, no account.
-- Location is used on the device only.
-- Network traffic: map tiles and fonts from `tiles.openfreemap.org`. As with any web request, that server sees your IP
-  address and which map tiles you load (which reveals the area you're viewing).
-- Settings (theme, heading-up) are stored locally on the device. `allowBackup` is off.
+- Location is processed on the device. It leaves the phone only as described below, and only when you use a feature.
+- Network traffic (every server also sees your IP address, as with any web request):
+  - `tiles.openfreemap.org`: map tiles and fonts (reveals the area you view).
+  - Search server (default `photon.komoot.io`): the text you type and your position **rounded to ~1 km** (for ranking).
+    Long-press sends the pressed point for reverse geocoding.
+  - Routing server (default `valhalla1.openstreetmap.de`): start point (your position, accuracy and heading) and destination
+    of each route request, including automatic reroutes.
+- Zoomi has no server of its own yet; nothing is stored about you anywhere except on your phone.
+- Settings and saved places are stored locally on the device. `allowBackup` is off.
 
 This section will be updated, before release, for every milestone that adds a network feature.
 
-## Known limitations (milestone a)
+## Known limitations
 
-- No search, routing, offline maps, alerts or traffic yet.
-- Map needs internet; tiles you've already viewed are cached by MapLibre, but there is no offline download yet.
+- Needs internet: no offline maps or offline routing yet (milestone c). If the connection drops mid-trip, guidance
+  continues on the current route, but rerouting fails until the connection returns.
+- Car only. Bike, walking, public transport and the "no road route / water crossing" dialog come in milestone (d).
+- ETAs don't include live traffic (milestone g), so rush-hour estimates will be optimistic.
+- Default servers are community-run with strict limits (1 req/s). Fine for personal use and testing; a public release
+  should use Zoomi's own routing server (planned on Oracle Always Free at milestone e). FOSSGIS also requires an operator
+  contact email on the app's website before public distribution.
+- Speed limits and lane arrows only appear where OpenStreetMap has `maxspeed` / `turn:lanes`.
+- Voice language follows the phone's system language; quality depends on the installed Android TTS voice.
 - Heading: no gyro fusion or dead reckoning yet (milestone c). At start-up you get a dot until you drive.
 - Tunnel detection depends on OSM having the road tagged `tunnel=yes` and on the map following you.
 - The light sensor on most phones faces the screen side; in a mount it may be shaded. That's why it never switches the theme alone.

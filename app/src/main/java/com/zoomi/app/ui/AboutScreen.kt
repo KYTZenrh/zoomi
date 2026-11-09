@@ -25,6 +25,11 @@ private data class Credit(val name: String, val detail: String, val url: String)
 
 private val credits = listOf(
     Credit("© OpenStreetMap contributors", "Map data, available under the Open Database License (ODbL).", "https://www.openstreetmap.org/copyright"),
+    Credit("Report or fix a map error", "Map data is made by volunteers. If something is wrong, you can fix it in OpenStreetMap.", "https://www.openstreetmap.org/fixthemap"),
+    Credit("Valhalla routing (FOSSGIS e.V. server)", "Routes and turn-by-turn instructions. Valhalla is MIT-licensed; the public server is run by FOSSGIS volunteers.", "https://fossgis.de/arbeitsgruppen/osm-server/nutzungsbedingungen/"),
+    Credit("Photon search (komoot)", "Search and address lookup. Photon is Apache-2.0; public server by komoot.", "https://github.com/komoot/photon"),
+    Credit("Ferrostar", "Navigation logic (progress, off-route detection, voice). BSD 3-Clause, Stadia Maps.", "https://github.com/stadiamaps/ferrostar"),
+    Credit("OkHttp", "HTTP client, Apache License 2.0.", "https://square.github.io/okhttp/"),
     Credit("OpenMapTiles", "Vector tile schema, © OpenMapTiles (CC-BY 4.0).", "https://www.openmaptiles.org/"),
     Credit("OpenFreeMap", "Free vector tile hosting.", "https://openfreemap.org"),
     Credit("MapLibre Native", "Map rendering engine, BSD 2-Clause license.", "https://github.com/maplibre/maplibre-native"),
@@ -48,8 +53,10 @@ fun AboutScreen(onBack: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
             Text(
-                "What leaves your phone today: map tile requests to tiles.openfreemap.org (which tiles you look at, " +
-                    "plus your IP address as with any web request). Nothing else.",
+                "What leaves your phone: map tiles from tiles.openfreemap.org (reveals the area you view); " +
+                    "search text and your position rounded to ~1 km to the search server; the start and destination " +
+                    "of each route you request to the routing server. Every server also sees your IP address. " +
+                    "Zoomi itself stores nothing on any server. Saved places stay on this phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),

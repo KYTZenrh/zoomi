@@ -4,8 +4,6 @@ import android.app.Application
 import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.zoomi.app.data.SettingsRepository
-import com.zoomi.app.location.GnssLocationSource
 import com.zoomi.app.sensors.LightSensorSource
 import com.zoomi.core.location.CourseTracker
 import com.zoomi.core.theme.AutoThemeController
@@ -32,8 +30,8 @@ data class ThemeDiagnostics(
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-    private val settings = SettingsRepository(app)
-    val gnss = GnssLocationSource(app)
+    private val settings = app.zoomi.settings
+    val gnss = app.zoomi.gnss
     private val light = LightSensorSource(app)
     private val controller = AutoThemeController()
     private val courseTracker = CourseTracker()
@@ -123,10 +121,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         light.start()
     }
 
-    fun onStop() {
-        gnss.stop()
+    /** @param keepGps true while navigating: guidance continues in the background via the foreground service. */
+    fun onStop(keepGps: Boolean) {
+        if (!keepGps) gnss.stop()
         light.stop()
     }
+
+    val valhallaUrl: StateFlow<String> =
+        settings.valhallaUrl.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.data.SettingsRepository.DEFAULT_VALHALLA)
+    val photonUrl: StateFlow<String> =
+        settings.photonUrl.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.data.SettingsRepository.DEFAULT_PHOTON)
+    fun setValhallaUrl(url: String?) = viewModelScope.launch { settings.setValhallaUrl(url) }
+    fun setPhotonUrl(url: String?) = viewModelScope.launch { settings.setPhotonUrl(url) }
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settings.setThemeMode(mode) }
     fun setCourseUp(value: Boolean) = viewModelScope.launch { settings.setCourseUp(value) }
