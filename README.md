@@ -16,7 +16,8 @@ alerts and traffic are planned (see Roadmap) and **not in the app yet**. Nothing
   - Auto = dark from sunset to sunrise at your position (computed on the phone, offline), with hysteresis:
     dark below −2° sun elevation, light above +1°, at most one switch per minute.
   - Auto also turns dark **in tunnels**: the map must show a tunnel road under you, plus GPS lost ≥3 s or light < 30 lux for 2 s.
-    Exit needs fresh GPS and the map showing no tunnel for 3 s, or > 200 lux for 5 s.
+    Entry also requires that you were driving (>= 4 m/s) in the last 15 s. Exit needs fresh GPS and the map
+    showing no tunnel for 3 s, 8 s of accurate GPS (<= 25 m) when the map is unknown, or > 200 lux for 5 s.
   - Settings → "Why the theme is what it is now" shows the live inputs (sun elevation, lux, GPS age, tunnel).
 
 ## Build

@@ -99,6 +99,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             lastFixAgeMs = fixAge,
             onTunnelRoad = onTunnelRoad,
             systemDark = systemDark,
+            speedMps = loc?.takeIf { it.hasSpeed() }?.speed,
+            accuracyM = loc?.takeIf { it.hasAccuracy() }?.accuracy,
         )
         _decision.value = controller.decide(themeMode.value, input)
         _diagnostics.value = ThemeDiagnostics(

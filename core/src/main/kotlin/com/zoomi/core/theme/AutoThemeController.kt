@@ -22,6 +22,10 @@ data class ThemeInputs(
     val lastFixAgeMs: Long?,
     val onTunnelRoad: Boolean?,
     val systemDark: Boolean,
+    /** GNSS speed of the latest fix (m/s), null if unknown. */
+    val speedMps: Float? = null,
+    /** Horizontal accuracy of the latest fix (m), null if unknown. */
+    val accuracyM: Float? = null,
 )
 
 /**

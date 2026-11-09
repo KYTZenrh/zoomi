@@ -78,7 +78,7 @@ fun ZoomiMap(
     LaunchedEffect(mapView) {
         mapView.getMapAsync { m ->
             m.uiSettings.isLogoEnabled = false
-            m.uiSettings.isAttributionEnabled = true
+            m.uiSettings.isAttributionEnabled = false // own "© OpenStreetMap" label opens full credits
             m.uiSettings.isCompassEnabled = false // our own compass button handles orientation
             m.uiSettings.isRotateGesturesEnabled = true
             m.addOnCameraMoveStartedListener { reason ->
@@ -143,10 +143,10 @@ fun ZoomiMap(
     AndroidView(factory = { mapView }, modifier = modifier)
 }
 
-/** True if a tunnel road is drawn within ~12 px of the vehicle, false if not, null if unknown. */
+/** True if a tunnel road is drawn within ~6 dp of the vehicle, false if not, null if unknown. */
 private fun queryTunnel(map: MapLibreMap, loc: Location): Boolean? {
     val p = map.projection.toScreenLocation(LatLng(loc.latitude, loc.longitude))
-    val r = 12f * android.content.res.Resources.getSystem().displayMetrics.density
+    val r = 6f * android.content.res.Resources.getSystem().displayMetrics.density
     val box = RectF(p.x - r, p.y - r, p.x + r, p.y + r)
     if (map.cameraPosition.zoom < 13.0) return null
     if (!map.projection.visibleRegion.latLngBounds.contains(LatLng(loc.latitude, loc.longitude))) return null

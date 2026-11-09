@@ -1,20 +1,22 @@
 package com.zoomi.core.theme
 
 /**
- * Detects "inside a tunnel" by combining three signals, with debouncing so it can't flicker.
+ * Detects "inside a tunnel" by combining map data, GNSS and the light sensor, with
+ * debouncing so it can't flicker.
  *
- * Enter when the road under the vehicle is mapped as a tunnel AND at least one of these
- * has been true for its hold time:
- *  - GNSS fix lost (no fix for [gpsLostEnterMs]), or
- *  - ambient light below [darkLux] for [luxEnterMs].
+ * Enter only when ALL of these hold:
+ *  - the road under the vehicle is mapped as a tunnel,
+ *  - the vehicle was moving (>= [movingSpeedMps]) within the last [recentMotionMs]
+ *    (you drive into a tunnel; a phone indoors next to a mapped underpass must not trigger), and
+ *  - GNSS fix lost for [gpsLostEnterMs], OR ambient light below [darkLux] for [luxEnterMs].
  *
- * Exit (only after at least [minTunnelMs] in tunnel mode) when either:
- *  - a fresh GNSS fix exists AND the map no longer says tunnel, continuously for [exitHoldMs], or
- *  - ambient light above [brightLux] continuously for [luxExitMs] while GNSS is fresh.
+ * Exit (only after at least [minTunnelMs]) when any of these holds:
+ *  - fresh GNSS fix AND map says "not tunnel", continuously for [exitHoldMs];
+ *  - fresh, accurate (<= [goodAccuracyM]) GNSS fix for [goodFixExitMs] while the map does NOT
+ *    positively say tunnel (covers "map unknown", e.g. when the map isn't following you);
+ *  - ambient light above [brightLux] for [luxExitMs] while GNSS is fresh.
  *
- * If map data is unknown (null), we never ENTER on sensor data alone. A car park, a bridge
- * shadow or a pocket would otherwise trigger it. Once inside, unknown map data counts as
- * "maybe still tunnel", so exit then needs the light condition.
+ * Map data alone never enters, and neither does the light sensor alone.
  */
 class TunnelDetector(
     private val gpsLostEnterMs: Long = 3_000,
@@ -25,6 +27,10 @@ class TunnelDetector(
     private val exitHoldMs: Long = 3_000,
     private val freshFixMs: Long = 2_000,
     private val minTunnelMs: Long = 4_000,
+    private val movingSpeedMps: Float = 4f,
+    private val recentMotionMs: Long = 15_000,
+    private val goodAccuracyM: Float = 25f,
+    private val goodFixExitMs: Long = 8_000,
 ) {
     var inTunnel: Boolean = false
         private set
@@ -32,7 +38,9 @@ class TunnelDetector(
     private val darkSince = Since()
     private val brightSince = Since()
     private val outsideSince = Since()
+    private val goodFixSince = Since()
     private var enteredAtMs: Long = 0
+    private var lastMovingMs: Long? = null
 
     fun update(input: ThemeInputs): Boolean {
         val now = input.nowMs
@@ -43,20 +51,26 @@ class TunnelDetector(
         val fixAge = input.lastFixAgeMs
         val gpsLost = fixAge == null || fixAge >= gpsLostEnterMs
         val gpsFresh = fixAge != null && fixAge < freshFixMs
+        if (gpsFresh && (input.speedMps ?: 0f) >= movingSpeedMps) lastMovingMs = now
+        val recentlyMoving = lastMovingMs?.let { now - it <= recentMotionMs } ?: false
 
         if (!inTunnel) {
             outsideSince.reset()
+            goodFixSince.reset()
             val darkLongEnough = darkSince.heldFor(now) >= luxEnterMs
-            if (input.onTunnelRoad == true && (gpsLost || darkLongEnough)) {
+            if (input.onTunnelRoad == true && recentlyMoving && (gpsLost || darkLongEnough)) {
                 inTunnel = true
                 enteredAtMs = now
             }
         } else {
             outsideSince.track(gpsFresh && input.onTunnelRoad == false, now)
+            val accurate = input.accuracyM?.let { it <= goodAccuracyM } ?: false
+            goodFixSince.track(gpsFresh && accurate && input.onTunnelRoad != true, now)
             val minElapsed = now - enteredAtMs >= minTunnelMs
             val mapSaysOut = outsideSince.heldFor(now) >= exitHoldMs
+            val gpsSaysOut = goodFixSince.heldFor(now) >= goodFixExitMs
             val lightSaysOut = gpsFresh && brightSince.heldFor(now) >= luxExitMs
-            if (minElapsed && (mapSaysOut || lightSaysOut)) {
+            if (minElapsed && (mapSaysOut || gpsSaysOut || lightSaysOut)) {
                 inTunnel = false
             }
         }
