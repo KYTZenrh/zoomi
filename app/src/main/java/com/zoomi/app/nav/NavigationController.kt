@@ -96,6 +96,16 @@ class NavigationController(
 
     fun start(route: Route) = core.startNavigation(route, config)
 
+    /** Travel mode for the next route requests and reroutes (Valhalla costing). */
+    fun setCosting(costing: String) { routeProvider.costing = costing }
+
+    /** Ferries, long bridges and tunnels along a route. */
+    suspend fun crossings(route: Route): List<com.zoomi.core.nav.Crossing> {
+        val shape = route.geometry.map { com.zoomi.core.location.LatLon(it.lat, it.lng) }
+        val text = routeProvider.traceAttributes(shape)
+        return com.zoomi.core.nav.Crossings.summarize(com.zoomi.core.nav.Crossings.parseTraceAttributes(text))
+    }
+
     fun stop() {
         core.stopNavigation()
         tts.stopAndClearQueue()

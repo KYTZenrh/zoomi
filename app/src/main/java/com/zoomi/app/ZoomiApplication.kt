@@ -17,6 +17,7 @@ class ZoomiApplication : Application() {
 
     @Volatile var photonUrl: String = SettingsRepository.DEFAULT_PHOTON
     val photon by lazy { PhotonClient { photonUrl } }
+    val transit by lazy { com.zoomi.app.transit.TransitClient() }
 }
 
 val android.content.Context.zoomi: ZoomiApplication get() = applicationContext as ZoomiApplication

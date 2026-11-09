@@ -11,8 +11,11 @@ android {
         applicationId = "com.zoomi.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0-b"
+        versionCode = 4
+        versionName = "0.4.0-d"
+        // Contact shown to community server operators in the User-Agent (FOSSGIS / Transitous ask for one).
+        // Set with -Pzoomi.contact=... or in gradle.properties; empty until the project is published.
+        buildConfigField("String", "ZOOMI_CONTACT", "\"" + (project.findProperty("zoomi.contact") ?: "") + "\"")
     }
 
     buildTypes {

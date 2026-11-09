@@ -14,10 +14,14 @@ import java.util.concurrent.ConcurrentHashMap
  * - No cookies, no tracking headers, no analytics.
  */
 object ZoomiHttp {
-    val USER_AGENT = "Zoomi-Android/${BuildConfig.VERSION_NAME} (open-source navigation app)"
+    val USER_AGENT = "Zoomi-Android/${BuildConfig.VERSION_NAME} (open-source navigation app" +
+        (if (BuildConfig.ZOOMI_CONTACT.isNotBlank()) "; ${BuildConfig.ZOOMI_CONTACT})" else ")")
 
-    /** Hosts with a published 1 request/second limit (checked 2026-11-09). */
-    private val ONE_PER_SECOND_HOSTS = setOf("valhalla1.openstreetmap.de", "photon.komoot.io")
+    /**
+     * Community servers we space out to at most 1 request/second (FOSSGIS and komoot publish this
+     * limit; Transitous asks to keep usage light, so we apply the same rule). Checked 2026-11-09.
+     */
+    private val ONE_PER_SECOND_HOSTS = setOf("valhalla1.openstreetmap.de", "photon.komoot.io", "api.transitous.org")
     private val limiters = ConcurrentHashMap<String, MinIntervalLimiter>()
 
     private val politeness = Interceptor { chain ->

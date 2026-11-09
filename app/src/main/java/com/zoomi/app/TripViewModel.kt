@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,18 +30,32 @@ import java.util.UUID
 
 data class RouteOption(val route: Route, val durationSec: Double, val distanceM: Double)
 
+/** The destination can't be reached with this mode (island, sea, no road/path). */
+data class Unreachable(
+    val reason: com.zoomi.core.nav.RouteFailure?,
+    /** How far the best route ends from the destination (null when no route at all). */
+    val gapKm: Double?,
+    val airportsNearYou: List<Place> = emptyList(),
+    val airportsNearDestination: List<Place> = emptyList(),
+)
+
 sealed interface TripUi {
     data object Idle : TripUi
     data class Preview(
         val destination: Place,
+        val mode: com.zoomi.core.nav.TravelMode = com.zoomi.core.nav.TravelMode.CAR,
         val loading: Boolean = true,
         val routes: List<RouteOption> = emptyList(),
         val selected: Int = 0,
         val error: String? = null,
         /** Computed on the phone from a downloaded region (no connection or server unreachable). */
         val offline: Boolean = false,
+        /** Ferries / long bridges / long tunnels on the selected route (null = not checked yet). */
+        val crossings: List<com.zoomi.core.nav.Crossing>? = null,
+        val unreachable: Unreachable? = null,
+        val itineraries: List<com.zoomi.core.transit.Itinerary> = emptyList(),
     ) : TripUi
-    data class Navigating(val destination: Place) : TripUi
+    data class Navigating(val destination: Place, val mode: com.zoomi.core.nav.TravelMode = com.zoomi.core.nav.TravelMode.CAR) : TripUi
     data class Arrived(val destination: Place) : TripUi
 }
 
@@ -92,7 +105,7 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             navState.collect { s ->
-                _speedLimit.value = nav.speedLimit(s)
+                _speedLimit.value = if ((_trip.value as? TripUi.Navigating)?.mode == com.zoomi.core.nav.TravelMode.CAR) nav.speedLimit(s) else null
                 val current = _trip.value
                 if (current is TripUi.Navigating && s.tripState is TripState.Complete) {
                     _trip.value = TripUi.Arrived(current.destination)
@@ -154,30 +167,99 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
 
     fun retryRoutes() = requestRoutes()
 
+    fun setMode(mode: com.zoomi.core.nav.TravelMode) {
+        val p = _trip.value as? TripUi.Preview ?: return
+        if (p.mode == mode) return
+        _trip.value = p.copy(mode = mode)
+        requestRoutes()
+    }
+
     private fun requestRoutes() {
         val p = _trip.value as? TripUi.Preview ?: return
         routeJob?.cancel()
-        _trip.value = p.copy(loading = true, error = null, routes = emptyList(), selected = 0)
+        _trip.value = p.copy(loading = true, error = null, routes = emptyList(), selected = 0,
+            crossings = null, unreachable = null, itineraries = emptyList())
         routeJob = viewModelScope.launch {
             val from = z.gnss.location.value
             if (from == null) {
                 update { it.copy(loading = false, error = "Waiting for a GPS fix. Go outside or near a window and retry.") }
                 return@launch
             }
+            if (p.mode == com.zoomi.core.nav.TravelMode.TRANSIT) { requestTransit(from.latitude, from.longitude, p); return@launch }
+            nav.setCosting(p.mode.valhallaCosting!!)
+            val dest = com.zoomi.core.location.LatLon(p.destination.lat, p.destination.lon)
             try {
-                val routes = nav.routes(from, p.destination.lat, p.destination.lon).map {
+                val routes = nav.routes(from, dest.lat, dest.lon).map {
                     RouteOption(it, it.steps.sumOf { s -> s.duration }, it.distance)
                 }
+                if (routes.isEmpty()) { update { it.copy(loading = false, error = "No route found.") }; return@launch }
+                val end = routes[0].route.geometry.last().let { com.zoomi.core.location.LatLon(it.lat, it.lng) }
+                val reachable = com.zoomi.core.nav.Reachability.reachable(p.mode, dest, end)
                 update {
-                    if (routes.isEmpty()) it.copy(loading = false, error = "No route found.")
-                    else it.copy(loading = false, routes = routes, selected = 0,
-                        offline = nav.routeProvider.lastSource.value == com.zoomi.app.nav.RouteSource.OFFLINE)
+                    it.copy(loading = false, routes = routes, selected = 0,
+                        offline = nav.routeProvider.lastSource.value == com.zoomi.app.nav.RouteSource.OFFLINE,
+                        unreachable = if (reachable) null else Unreachable(null, com.zoomi.core.nav.Reachability.gapMeters(dest, end) / 1000))
                 }
+                if (!reachable) loadAirports(from.latitude, from.longitude, dest)
+                loadCrossings()
             } catch (e: Exception) {
                 Log.w("Zoomi", "route failed", e)
-                val msg = if (e is com.zoomi.app.nav.RoutingException) e.message else "Couldn't get a route: ${e.message ?: e::class.simpleName}"
-                update { it.copy(loading = false, error = msg) }
+                val re = e as? com.zoomi.app.nav.RoutingException
+                val failure = re?.failure
+                if (failure == com.zoomi.core.nav.RouteFailure.NO_ROUTE || failure == com.zoomi.core.nav.RouteFailure.NO_ROAD_NEAR_DESTINATION) {
+                    update { it.copy(loading = false, unreachable = Unreachable(failure, null)) }
+                    loadAirports(from.latitude, from.longitude, dest)
+                } else {
+                    val msg = when (failure) {
+                        com.zoomi.core.nav.RouteFailure.TOO_FAR_FOR_SERVER ->
+                            "This trip is longer than the routing server allows. Try a closer destination or public transport."
+                        else -> re?.message ?: "Couldn't get a route: ${e.message ?: e::class.simpleName}"
+                    }
+                    update { it.copy(loading = false, error = msg) }
+                }
             }
+        }
+    }
+
+    private suspend fun requestTransit(fromLat: Double, fromLon: Double, p: TripUi.Preview) {
+        if (!z.network.online.value) {
+            update { it.copy(loading = false, error = "Public transport search needs an internet connection.") }
+            return
+        }
+        try {
+            val plan = z.transit.plan(fromLat, fromLon, p.destination.lat, p.destination.lon)
+            val its = plan.itineraries
+            val walk = plan.direct.firstOrNull { d -> d.legs.all { l -> l.mode == "WALK" } }
+            update {
+                when {
+                    its.isNotEmpty() -> it.copy(loading = false, itineraries = its, selected = 0)
+                    walk != null -> it.copy(loading = false, error = "Walking (${com.zoomi.core.nav.Formatting.duration(walk.durationSec.toDouble())}) " +
+                        "is quicker than any public transport for this trip.")
+                    else -> it.copy(loading = false, error = "No public transport connection found. Coverage depends on " +
+                        "which operators publish open timetables (see transitous.org/sources).")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("Zoomi", "transit failed", e)
+            update { it.copy(loading = false, error = "Public transport search failed: ${e.message}") }
+        }
+    }
+
+    private fun loadCrossings() {
+        val p = _trip.value as? TripUi.Preview ?: return
+        val route = p.routes.getOrNull(p.selected)?.route ?: return
+        viewModelScope.launch {
+            val c = runCatching { nav.crossings(route) }.onFailure { Log.w("Zoomi", "crossings failed", it) }.getOrNull()
+            update { if (it.routes.getOrNull(it.selected)?.route === route) it.copy(crossings = c ?: emptyList()) else it }
+        }
+    }
+
+    private fun loadAirports(fromLat: Double, fromLon: Double, dest: com.zoomi.core.location.LatLon) {
+        if (!z.network.online.value) return
+        viewModelScope.launch {
+            val near = runCatching { z.photon.airportsNear(fromLat, fromLon) }.getOrDefault(emptyList())
+            val far = runCatching { z.photon.airportsNear(dest.lat, dest.lon) }.getOrDefault(emptyList())
+            update { it.copy(unreachable = it.unreachable?.copy(airportsNearYou = near, airportsNearDestination = far)) }
         }
     }
 
@@ -186,13 +268,20 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         if (cur is TripUi.Preview) _trip.value = f(cur)
     }
 
-    fun selectRoute(index: Int) = update { if (index in it.routes.indices) it.copy(selected = index) else it }
+    fun selectRoute(index: Int) {
+        val p = _trip.value as? TripUi.Preview ?: return
+        val count = if (p.mode == com.zoomi.core.nav.TravelMode.TRANSIT) p.itineraries.size else p.routes.size
+        if (index !in 0 until count || index == p.selected) return
+        _trip.value = p.copy(selected = index, crossings = null)
+        if (p.mode != com.zoomi.core.nav.TravelMode.TRANSIT) loadCrossings()
+    }
 
     fun startNavigation() {
         val p = _trip.value as? TripUi.Preview ?: return
         val option = p.routes.getOrNull(p.selected) ?: return
+        if (p.mode == com.zoomi.core.nav.TravelMode.TRANSIT) return // itineraries are shown, not navigated
         nav.start(option.route)
-        _trip.value = TripUi.Navigating(p.destination)
+        _trip.value = TripUi.Navigating(p.destination, p.mode)
     }
 
     fun endTrip() {

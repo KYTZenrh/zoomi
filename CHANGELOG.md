@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased] 0.4.0-d, milestone (d)
+
+### Added
+- Travel modes: Car / Bike / Walk (online + offline, turn-by-turn) and Transit (Transitous / MOTIS 2, online, itineraries).
+- Water crossings: ferries, long bridges and tunnels per route via Valhalla trace_attributes (online or on-device).
+- Unreachable-destination handling: "no path" errors and snapped-far-away routes detected; asks how to travel
+  (public transport / walk) and shows nearest airports near you and near the destination (information only).
+- Walk-is-faster message when Transitous returns only a direct walk.
+- User-Agent contact build property `zoomi.contact`; Transitous added to the 1 req/s politeness limiter.
+- About: Transitous credit, sources and donation links.
+- Unit tests: polyline encode/decode, reachability, error classification, crossing merge, MOTIS parsing (72 total).
+
+### Fixed
+- Route preview buttons scrolled out of view with long content; actions are now pinned.
+
 ## [Unreleased] 0.3.0-c, milestone (c)
 
 ### Added

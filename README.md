@@ -2,10 +2,28 @@
 
 Free, open-source navigation for Android. No ads, no tracking, no Google Play Services.
 
-**Status: milestone (c), offline regions, offline routing and heading fix.** Other travel modes,
-accounts, alerts and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
+**Status: milestone (d), car / bike / walk / public transport and water crossings.** Accounts, alerts
+and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
 
 ## What works now
+
+### Milestone (d): travel modes and water crossings
+- **Car, Bike, Walk** (Valhalla `auto` / `bicycle` / `pedestrian`), online and offline, with turn-by-turn and reroute.
+  Speed-limit signs only in car mode.
+- **Public transport** (online only) from [Transitous](https://transitous.org) (MOTIS 2): departure/arrival times,
+  lines, operators, walking legs, transfers; drawn on the map. Itinerary only, no turn-by-turn for transit.
+  Shows "timetable" vs "live" per leg. If walking beats transit, it says so.
+  Coverage depends on which operators publish open GTFS timetables. In Iași (SCTP) it works with real data;
+  see transitous.org/sources for other places. Nothing is invented: no data means "no connection found".
+- **Water crossings**: every route is checked with Valhalla `trace_attributes` (online, or on the phone offline).
+  The preview lists **ferries first**, then the longest bridges and tunnels (≥ 300 m, with names when OSM has them).
+  Zoomi doesn't know ferry schedules or prices and says so. Note: Valhalla doesn't say what a bridge crosses,
+  so a listed bridge may span a valley or railway, not water.
+- **Unreachable destinations**: if routing fails ("no path") or the route ends more than 2 km (car) / 1 km (bike, walk)
+  from the destination, because Valhalla snaps islands or sea points to the nearest road, the card says
+  "Can't reach this destination by car" and asks how to travel instead: public transport or walking, plus the
+  **nearest airports** to you and to the destination as information only (OSM `aeroway=aerodrome` via Photon).
+  There are no flight schedules or prices.
 
 ### Milestone (c): offline + heading
 - **Offline regions** (Settings → Offline regions): map (PMTiles) + routing network (Valhalla tile extract) per region.
@@ -91,6 +109,7 @@ Install on a phone with USB debugging enabled: `adb install -r app/build/outputs
 | Photon on photon.komoot.io (komoot) | search, reverse geocoding | Photon Apache-2.0; public server "fair use, heavy use throttled" |
 | Ferrostar (Stadia Maps) | navigation logic, TTS, foreground service | BSD 3-Clause |
 | OkHttp | HTTP | Apache-2.0 |
+| Transitous (MOTIS 2), api.transitous.org | public transport journeys | volunteer-run, FOSS/non-commercial only; requires User-Agent with contact and a link to transitous.org/sources |
 | valhalla-mobile (Rallista) 0.6.4 / Valhalla 3.9.1 | on-device routing | MIT |
 | Planetiler 0.10.2 (OpenMapTiles profile) | building offline map files | Apache-2.0 (tool); output ODbL |
 | Natural Earth | low-zoom map data in offline files | public domain |
@@ -107,13 +126,18 @@ Attribution is visible on the map (bottom-left "© OpenStreetMap") and in Settin
   - Search server (default `photon.komoot.io`): the text you type and your position **rounded to ~1 km** (for ranking).
     Long-press sends the pressed point for reverse geocoding.
   - Routing server (default `valhalla1.openstreetmap.de`): start point (your position, accuracy and heading) and destination
-    of each route request, including automatic reroutes.
+    of each route request, including automatic reroutes, plus the route shape for the bridge/ferry/tunnel check.
+  - `api.transitous.org`: start and destination of public transport searches (only when you pick Transit).
+  - Search server: when a destination is unreachable, two airport lookups near you and near the destination.
 - Zoomi has no server of its own yet; nothing is stored about you anywhere except on your phone.
 - Settings and saved places are stored locally on the device. `allowBackup` is off.
 
 This section will be updated, before release, for every milestone that adds a network feature.
 
 ## Known limitations
+
+- Public transport: online only, coverage varies by city/operator, no turn-by-turn, no ticket prices.
+- Before a public release, set a contact in the User-Agent (`-Pzoomi.contact=...`): Transitous and FOSSGIS require one.
 
 - Zoomi doesn't host region files yet (needs a public host; planned with the first release / server milestone).
   Today: build them with `data-pipeline/`, copy the folder to the phone (e.g. Downloads) and import it, or point the app at

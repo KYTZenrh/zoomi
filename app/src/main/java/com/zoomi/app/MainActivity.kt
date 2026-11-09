@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
                     onOpenSettings = { screen = Screen.SETTINGS },
                     onOpenAbout = { screen = Screen.ABOUT },
                     onLongPress = { lat, lon -> tripVm.chooseMapPoint(lat, lon) },
+                    onMode = tripVm::setMode,
                     onSelectRoute = tripVm::selectRoute,
                     onStart = ::startNavigation,
                     onRetry = tripVm::retryRoutes,

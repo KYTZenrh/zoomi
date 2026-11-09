@@ -73,6 +73,7 @@ fun MapScreen(
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
     onLongPress: (Double, Double) -> Unit,
+    onMode: (com.zoomi.core.nav.TravelMode) -> Unit,
     onSelectRoute: (Int) -> Unit,
     onStart: () -> Unit,
     onRetry: () -> Unit,
@@ -103,7 +104,9 @@ fun MapScreen(
     } else location?.let { Puck(it.latitude, it.longitude, course) }
 
     val routes: List<List<LatLng>> = when (trip) {
-        is TripUi.Preview -> trip.routes.map { r -> r.route.geometry.map { LatLng(it.lat, it.lng) } }
+        is TripUi.Preview ->
+            if (trip.mode == com.zoomi.core.nav.TravelMode.TRANSIT) trip.itineraries.map { it.geometry.map { p -> LatLng(p.lat, p.lon) } }
+            else trip.routes.map { r -> r.route.geometry.map { LatLng(it.lat, it.lng) } }
         is TripUi.Navigating -> listOf(navState.routeGeometry.map { LatLng(it.lat, it.lng) })
         else -> emptyList()
     }
@@ -211,6 +214,7 @@ fun MapScreen(
         when (trip) {
             is TripUi.Preview -> RoutePreviewCard(
                 preview = trip,
+                onMode = onMode,
                 onSelect = onSelectRoute,
                 onStart = onStart,
                 onRetry = onRetry,

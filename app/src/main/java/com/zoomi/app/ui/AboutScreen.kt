@@ -28,6 +28,8 @@ private val credits = listOf(
     Credit("Report or fix a map error", "Map data is made by volunteers. If something is wrong, you can fix it in OpenStreetMap.", "https://www.openstreetmap.org/fixthemap"),
     Credit("Valhalla routing (FOSSGIS e.V. server)", "Routes and turn-by-turn instructions. Valhalla is MIT-licensed; the public server is run by FOSSGIS volunteers.", "https://fossgis.de/arbeitsgruppen/osm-server/nutzungsbedingungen/"),
     Credit("Photon search (komoot)", "Search and address lookup. Photon is Apache-2.0; public server by komoot.", "https://github.com/komoot/photon"),
+    Credit("Transitous", "Public transport journeys (MOTIS 2), run by volunteers. Data from many transport operators; tap for the list of sources.", "https://transitous.org/sources/"),
+    Credit("Support Transitous", "Transitous runs on donations.", "https://transitous.org/donate/"),
     Credit("Ferrostar", "Navigation logic (progress, off-route detection, voice). BSD 3-Clause, Stadia Maps.", "https://github.com/stadiamaps/ferrostar"),
     Credit("OkHttp", "HTTP client, Apache License 2.0.", "https://square.github.io/okhttp/"),
     Credit("OpenMapTiles", "Vector tile schema, © OpenMapTiles (CC-BY 4.0).", "https://www.openmaptiles.org/"),
@@ -55,7 +57,8 @@ fun AboutScreen(onBack: () -> Unit) {
             Text(
                 "What leaves your phone: map tiles from tiles.openfreemap.org (reveals the area you view); " +
                     "search text and your position rounded to ~1 km to the search server; the start and destination " +
-                    "of each route you request to the routing server. Every server also sees your IP address. " +
+                    "of each route you request to the routing server; start and destination of public transport searches to Transitous. " +
+                    "Every server also sees your IP address. " +
                     "Zoomi itself stores nothing on any server. Saved places stay on this phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
