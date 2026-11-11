@@ -100,14 +100,26 @@ fun MapScreen(
     // While navigating, draw the vehicle snapped to the route with the route's course.
     val puck = if (navigating != null && nav != null) {
         val s = nav.snappedUserLocation
-        Puck(s.coordinates.lat, s.coordinates.lng, s.courseOverGround?.degrees?.toFloat() ?: course)
-    } else location?.let { Puck(it.latitude, it.longitude, course) }
+        Puck(s.coordinates.lat, s.coordinates.lng, s.courseOverGround?.degrees?.toFloat() ?: course,
+            location?.takeIf { it.hasAccuracy() }?.accuracy)
+    } else location?.let { Puck(it.latitude, it.longitude, course, it.takeIf { l -> l.hasAccuracy() }?.accuracy) }
+
+    // While navigating, draw only the road still ahead: the part already driven disappears.
+    val routePolyline = androidx.compose.runtime.remember(navState.routeGeometry) {
+        navState.routeGeometry.takeIf { it.size >= 2 }
+            ?.let { g -> com.zoomi.core.location.Polyline(g.map { com.zoomi.core.location.LatLon(it.lat, it.lng) }) }
+    }
+    val remaining = if (navigating != null && nav != null && routePolyline != null) {
+        val here = nav.snappedUserLocation.coordinates
+        routePolyline.sliceFrom(routePolyline.project(com.zoomi.core.location.LatLon(here.lat, here.lng)))
+            .map { LatLng(it.lat, it.lon) }
+    } else null
 
     val routes: List<List<LatLng>> = when (trip) {
         is TripUi.Preview ->
             if (trip.mode == com.zoomi.core.nav.TravelMode.TRANSIT) trip.itineraries.map { it.geometry.map { p -> LatLng(p.lat, p.lon) } }
             else trip.routes.map { r -> r.route.geometry.map { LatLng(it.lat, it.lng) } }
-        is TripUi.Navigating -> listOf(navState.routeGeometry.map { LatLng(it.lat, it.lng) })
+        is TripUi.Navigating -> listOf(remaining ?: navState.routeGeometry.map { LatLng(it.lat, it.lng) })
         else -> emptyList()
     }
     val selected = (trip as? TripUi.Preview)?.selected ?: 0

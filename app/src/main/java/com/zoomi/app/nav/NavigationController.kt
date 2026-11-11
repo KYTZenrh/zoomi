@@ -47,14 +47,52 @@ class NavigationController(
     network: NetworkMonitor,
 ) {
     private val appContext = context.applicationContext
-    private val tts = AndroidTtsObserver(appContext).also { it.start() }
+    private var tts = newTts(null)
+    @Volatile private var ttsVoiceName: String? = null
+    @Volatile private var ttsMuted = false
+
+    /** Guidance language (affects instruction text from Valhalla and the TTS voice). */
+    @Volatile var guidanceLanguage: GuidanceLanguage = GuidanceLanguage.AUTO
+
+    private fun newTts(engine: String?): AndroidTtsObserver =
+        AndroidTtsObserver(appContext, engine = engine, statusObserver = object : com.stadiamaps.ferrostar.core.AndroidTtsStatusListener {
+            override fun onTtsInitialized(tts: android.speech.tts.TextToSpeech?, status: Int) {
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) applyVoice(tts)
+            }
+            override fun onTtsShutdownAndRelease() = Unit
+            override fun onTtsSpeakError(utteranceId: String, status: Int) {
+                android.util.Log.w("Zoomi", "TTS error $status for $utteranceId")
+            }
+        }).also { it.start() }
+
+    private fun applyVoice(t: android.speech.tts.TextToSpeech?) {
+        t ?: return
+        val voice = ttsVoiceName?.let { n -> t.voices?.firstOrNull { it.name == n } }
+        if (voice != null) t.voice = voice else t.language = Locale.forLanguageTag(VoiceCatalog.languageTag(guidanceLanguage))
+    }
+
+    /** Switch speech engine / voice. A new engine needs a new TTS instance. */
+    fun configureVoice(engine: String?, voiceName: String?, language: GuidanceLanguage) {
+        guidanceLanguage = language
+        ttsVoiceName = voiceName
+        if (engine != currentEngine) {
+            tts.shutdown()
+            tts = newTts(engine)
+            currentEngine = engine
+            core.spokenInstructionObserver = tts
+            tts.setMuted(ttsMuted)
+        } else {
+            applyVoice(tts.tts)
+        }
+    }
+    private var currentEngine: String? = null
     private val annotations = valhallaExtendedOSRMAnnotationPublisher()
     private val foreground = FerrostarForegroundServiceManager(appContext, ZoomiNotificationBuilder(appContext))
 
     /** Updated from settings. */
     @Volatile var valhallaUrl: String = SettingsRepository.DEFAULT_VALHALLA
 
-    val language: String get() = ValhallaLocale.pick(Locale.getDefault().toLanguageTag())
+    val language: String get() = ValhallaLocale.pick(VoiceCatalog.languageTag(guidanceLanguage))
 
     val routeProvider = HybridRouteProvider(
         appContext, regions,
@@ -92,7 +130,19 @@ class NavigationController(
     val state: StateFlow<NavigationState> = core.state
 
     suspend fun routes(from: Location, toLat: Double, toLon: Double): List<Route> =
-        core.getRoutes(from.toUserLocation(), listOf(Waypoint(GeographicCoordinate(toLat, toLon), WaypointKind.BREAK)))
+        core.getRoutes(startLocation(from), listOf(Waypoint(GeographicCoordinate(toLat, toLon), WaypointKind.BREAK)))
+
+    /**
+     * Valhalla treats a start heading as "the vehicle is facing this way" and will route forwards
+     * from it (even via a loop). A GPS bearing is only meaningful while moving, so when parked or
+     * walking slowly we send no heading and let Valhalla pick the best direction.
+     */
+    private fun startLocation(from: Location): uniffi.ferrostar.UserLocation {
+        val u = from.toUserLocation()
+        val moving = from.hasSpeed() && from.speed >= 4f &&
+            (!from.hasBearingAccuracy() || from.bearingAccuracyDegrees <= 30f)
+        return if (moving) u else uniffi.ferrostar.UserLocation(u.coordinates, u.horizontalAccuracy, null, u.timestamp, u.speed)
+    }
 
     fun start(route: Route) = core.startNavigation(route, config)
 
@@ -111,7 +161,7 @@ class NavigationController(
         tts.stopAndClearQueue()
     }
 
-    fun setMuted(muted: Boolean) = tts.setMuted(muted)
+    fun setMuted(muted: Boolean) { ttsMuted = muted; tts.setMuted(muted) }
 
     fun speedLimit(state: NavigationState): SpeedLimit? =
         when (val s = runCatching { annotations.map(state).speed }.getOrNull()) {

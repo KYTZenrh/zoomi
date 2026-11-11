@@ -52,6 +52,7 @@ fun SettingsScreen(
     onPhotonUrl: (String?) -> Unit,
     onOpenAbout: () -> Unit,
     onOpenRegions: () -> Unit,
+    onOpenVoice: () -> Unit,
     onBack: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -64,6 +65,13 @@ fun SettingsScreen(
                 "Offline regions",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenRegions).padding(20.dp),
+            )
+            HorizontalDivider()
+
+            Text(
+                "Voice guidance",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenVoice).padding(20.dp),
             )
             HorizontalDivider()
 

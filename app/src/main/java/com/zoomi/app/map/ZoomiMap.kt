@@ -38,6 +38,7 @@ import org.maplibre.geojson.Point
 
 private const val PUCK_SOURCE = "zoomi-puck"
 private const val PUCK_DOT = "zoomi-puck-dot"
+private const val PUCK_ACCURACY = "zoomi-puck-accuracy"
 private const val PUCK_ARROW = "zoomi-puck-arrow-layer"
 private const val ROUTE_SOURCE = "zoomi-routes"
 private const val ROUTE_ALT = "zoomi-route-alt"
@@ -47,8 +48,11 @@ private const val ROUTE_SEL_CASING = "zoomi-route-sel-casing"
 private const val DEST_SOURCE = "zoomi-dest"
 private const val DEST_LAYER = "zoomi-dest-layer"
 
-/** Where to draw the vehicle. [course] null = plain dot (no trustworthy heading). */
-data class Puck(val lat: Double, val lon: Double, val course: Float?)
+/**
+ * Where to draw the vehicle. [course] null = plain dot (no trustworthy heading).
+ * [accuracyM] draws the GPS accuracy circle around it (the true position is likely inside).
+ */
+data class Puck(val lat: Double, val lon: Double, val course: Float?, val accuracyM: Float? = null)
 
 /** Camera behaviour. */
 enum class CameraMode { FOLLOW, FREE, OVERVIEW, NAVIGATE }
@@ -167,6 +171,9 @@ fun ZoomiMap(
         val p = puck ?: return@LaunchedEffect
         val feature = Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat))
         if (p.course != null) feature.addNumberProperty("bearing", p.course)
+        // Accuracy radius in pixels at zoom 22 (MapLibre uses 512 px tiles: 78271.517 m/px at z0 on the equator).
+        val metersPerPxZ22 = 78271.517 * Math.cos(Math.toRadians(p.lat)) / 4_194_304.0
+        feature.addNumberProperty("r22", (p.accuracyM ?: 0f) / metersPerPxZ22)
         s.getSourceAs<GeoJsonSource>(PUCK_SOURCE)?.setGeoJson(feature)
 
         val navigating = cameraMode == CameraMode.NAVIGATE
@@ -228,6 +235,27 @@ private fun addOverlayLayers(s: Style, density: Float, brandColor: Int, dark: Bo
         CircleLayer(DEST_LAYER, DEST_SOURCE).withProperties(
             PropertyFactory.circleRadius(10f), PropertyFactory.circleColor("#E5484D"),
             PropertyFactory.circleStrokeColor("#FFFFFF"), PropertyFactory.circleStrokeWidth(3f),
+        )
+    )
+    // GPS accuracy circle: scales with zoom so it covers the same ground area; never smaller than a halo.
+    s.addLayer(
+        CircleLayer(PUCK_ACCURACY, PUCK_SOURCE).withProperties(
+            PropertyFactory.circleRadius(
+                Expression.max(
+                    Expression.literal(16f),
+                    Expression.interpolate(
+                        Expression.exponential(2f), Expression.zoom(),
+                        Expression.stop(0, Expression.division(Expression.get("r22"), Expression.literal(4_194_304f))),
+                        Expression.stop(22, Expression.get("r22")),
+                    ),
+                )
+            ),
+            PropertyFactory.circleColor(brandColor),
+            PropertyFactory.circleOpacity(0.15f),
+            PropertyFactory.circleStrokeColor(brandColor),
+            PropertyFactory.circleStrokeOpacity(0.45f),
+            PropertyFactory.circleStrokeWidth(1.5f),
+            PropertyFactory.circlePitchAlignment(Property.CIRCLE_PITCH_ALIGNMENT_MAP),
         )
     )
     s.addLayer(

@@ -87,6 +87,14 @@ class Polyline(private val pts: List<LatLon>) {
         return bestS
     }
 
+    /** The part of the line from distance [s] to the end (the route still ahead). */
+    fun sliceFrom(s: Double): List<LatLon> {
+        if (s <= 0.0) return pts
+        if (s >= length) return listOf(pts.last())
+        val i = segmentIndex(s)
+        return listOf(pointAt(s)) + pts.subList(i + 1, pts.size)
+    }
+
     fun pointAt(s: Double): LatLon {
         val i = segmentIndex(s)
         val segLen = cum[i + 1] - cum[i]

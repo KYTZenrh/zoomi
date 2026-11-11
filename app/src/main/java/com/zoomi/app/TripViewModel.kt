@@ -95,6 +95,10 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { z.settings.valhallaUrl.collect { nav.valhallaUrl = it } }
         viewModelScope.launch { z.regions.refresh() }
         viewModelScope.launch { voiceMuted.collect { nav.setMuted(it) } }
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(z.settings.ttsEngine, z.settings.ttsVoice, z.settings.guidanceLanguage) { e, v, l -> Triple(e, v, l) }
+                .collect { (e, v, l) -> nav.configureVoice(e, v, l) }
+        }
         viewModelScope.launch { runSearch() }
         // Give the dead reckoner the active route (or none).
         viewModelScope.launch {

@@ -32,12 +32,13 @@ import com.zoomi.app.ui.SettingsScreen
 import com.zoomi.app.ui.ZoomiTheme
 import org.maplibre.android.MapLibre
 
-private enum class Screen { MAP, SEARCH, SETTINGS, ABOUT, REGIONS }
+private enum class Screen { MAP, SEARCH, SETTINGS, ABOUT, REGIONS, VOICE }
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
     private val tripVm: TripViewModel by viewModels()
     private val regionsVm: RegionsViewModel by viewModels()
+    private val voiceVm: VoiceViewModel by viewModels()
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.onPermissionResult() }
@@ -166,7 +167,21 @@ class MainActivity : ComponentActivity() {
                             onPhotonUrl = vm::setPhotonUrl,
                             onOpenAbout = { screen = Screen.ABOUT },
                             onOpenRegions = { screen = Screen.REGIONS },
+                            onOpenVoice = { screen = Screen.VOICE },
                             onBack = { screen = Screen.MAP },
+                        )
+                    }
+                    Screen.VOICE -> {
+                        BackHandler { screen = Screen.SETTINGS }
+                        val voiceUi by voiceVm.ui.collectAsStateWithLifecycle()
+                        com.zoomi.app.ui.VoiceScreen(
+                            ui = voiceUi,
+                            onLanguage = voiceVm::setLanguage,
+                            onEngine = voiceVm::setEngine,
+                            onVoice = voiceVm::setVoice,
+                            onTest = voiceVm::test,
+                            onRefresh = voiceVm::refresh,
+                            onBack = { screen = Screen.SETTINGS },
                         )
                     }
                     Screen.REGIONS -> {

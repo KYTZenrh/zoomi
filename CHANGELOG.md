@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased] after field test (2026-11-11)
+
+### Added
+- Voice guidance settings: guidance language (phone / Română / English, applies to instruction text and voice),
+  speech engine choice (e.g. Samsung or Google), voice list per language with Test, "Get more voices".
+  Android doesn't expose voice gender; it's only shown when the voice name states it.
+- GPS accuracy circle around the position arrow (scales with zoom, minimum halo size).
+
+### Fixed
+- Driven part of the route stayed on the map; now only the road ahead is drawn while navigating.
+- Route requests while stopped sent a stale GPS heading, making Valhalla start in the wrong direction and loop;
+  heading is now only sent when moving (>= 4 m/s) with an accurate course.
+
 ## [Unreleased] 0.4.0-d, milestone (d)
 
 ### Added

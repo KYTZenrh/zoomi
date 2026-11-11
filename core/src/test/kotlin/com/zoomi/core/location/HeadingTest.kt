@@ -135,3 +135,27 @@ class DeadReckonerTest {
         assertEquals(pl.project(LatLon(45.0, 26.025)), s, 1.0)
     }
 }
+
+class RouteTrimTest {
+    private val route = listOf(LatLon(45.0, 26.0), LatLon(45.0, 26.05), LatLon(45.03, 26.05))
+
+    @Test fun sliceStartsAtVehicleAndKeepsTheRest() {
+        val pl = Polyline(route)
+        val ahead = pl.sliceFrom(pl.project(LatLon(45.0001, 26.025))) // vehicle mid first leg, slightly off the line
+        assertEquals(3, ahead.size)
+        assertEquals(26.025, ahead[0].lon, 1e-4)
+        assertEquals(45.0, ahead[0].lat, 1e-6)
+        assertEquals(route[1], ahead[1])
+        assertEquals(route[2], ahead[2])
+    }
+
+    @Test fun edges() {
+        val pl = Polyline(route)
+        assertEquals(route, pl.sliceFrom(0.0))
+        assertEquals(listOf(route.last()), pl.sliceFrom(pl.length + 10))
+        // On the second leg only the remainder of that leg is left.
+        val ahead = pl.sliceFrom(pl.project(LatLon(45.02, 26.05)))
+        assertEquals(2, ahead.size)
+        assertEquals(45.02, ahead[0].lat, 1e-4)
+    }
+}
