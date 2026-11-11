@@ -34,6 +34,8 @@ class SettingsRepository(private val context: Context) {
     private val imageryAttrKey = stringPreferencesKey("imagery_attribution")
     private val imagerySourceKey = stringPreferencesKey("imagery_source") // EOX | ESRI | CUSTOM
     private val esriKeyKey = stringPreferencesKey("esri_api_key")
+    private val maptilerKeyKey = stringPreferencesKey("maptiler_api_key")
+    private val maptilerTileSizeKey = androidx.datastore.preferences.core.intPreferencesKey("maptiler_tile_size")
     private val guidanceLangKey = stringPreferencesKey("guidance_language")
     private val ttsEngineKey = stringPreferencesKey("tts_engine")
     private val ttsVoiceKey = stringPreferencesKey("tts_voice")
@@ -59,6 +61,8 @@ class SettingsRepository(private val context: Context) {
         val key = p[esriKeyKey]
         when (p[imagerySourceKey] ?: if (!url.isNullOrBlank()) "CUSTOM" else "EOX") {
             "ESRI" -> if (!key.isNullOrBlank()) com.zoomi.app.map.Imagery.esri(key) else com.zoomi.app.map.Imagery.EOX
+            "MAPTILER" -> p[maptilerKeyKey]?.takeIf { it.isNotBlank() }
+                ?.let { com.zoomi.app.map.Imagery.mapTiler(it, p[maptilerTileSizeKey] ?: 512) } ?: com.zoomi.app.map.Imagery.EOX
             "CUSTOM" -> if (!url.isNullOrBlank())
                 com.zoomi.app.map.Imagery(url, p[imageryAttrKey]?.ifBlank { null } ?: "Imagery: custom source")
             else com.zoomi.app.map.Imagery.EOX
@@ -69,6 +73,7 @@ class SettingsRepository(private val context: Context) {
         p[imagerySourceKey] ?: if (!p[imageryUrlKey].isNullOrBlank()) "CUSTOM" else "EOX"
     }
     val esriKey: Flow<String> = context.dataStore.data.map { it[esriKeyKey] ?: "" }
+    val maptilerKey: Flow<String> = context.dataStore.data.map { it[maptilerKeyKey] ?: "" }
     val imageryCustomUrl: Flow<String> = context.dataStore.data.map { it[imageryUrlKey] ?: "" }
     val imageryCustomAttribution: Flow<String> = context.dataStore.data.map { it[imageryAttrKey] ?: "" }
     val catalogUrl: Flow<String> = context.dataStore.data.map { it[catalogKey] ?: "" }
@@ -89,6 +94,11 @@ class SettingsRepository(private val context: Context) {
     suspend fun setImagery(url: String, attribution: String) = context.dataStore.edit {
         if (url.isBlank()) { it.remove(imageryUrlKey); it.remove(imageryAttrKey) }
         else { it[imageryUrlKey] = url.trim(); it[imageryAttrKey] = attribution.trim() }
+    }
+    /** Stored only on this phone, with the tile size measured from a real tile. */
+    suspend fun setMaptilerKey(key: String, tileSize: Int) = context.dataStore.edit {
+        if (key.isBlank()) { it.remove(maptilerKeyKey); it.remove(maptilerTileSizeKey) }
+        else { it[maptilerKeyKey] = key.trim(); it[maptilerTileSizeKey] = tileSize }
     }
     suspend fun setImagerySource(source: String) = context.dataStore.edit { it[imagerySourceKey] = source }
     /** Stored only on this phone (never synced, never in the repo). */

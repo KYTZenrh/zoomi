@@ -62,6 +62,9 @@ fun SettingsScreen(
     esriKey: String,
     onImagerySource: (String) -> Unit,
     onEsriKey: (String) -> Unit,
+    maptilerKey: String,
+    keyCheck: String?,
+    onMaptilerKey: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -137,6 +140,9 @@ fun SettingsScreen(
             Text("Imagery source", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
             listOf(
                 "EOX" to ("EOxCloudless (default)" to "Free, no account. About 10 m per pixel: good overview, blurry at street level."),
+                "MAPTILER" to ("MapTiler Satellite (your own free key) · recommended" to "About 1–2 m per pixel in Romania, much sharper than the default. " +
+                    "Free account at maptiler.com, no credit card; 100,000 requests a month, then it pauses until next month (never billed). " +
+                    "Personal / non-commercial use. The key stays on this phone."),
                 "ESRI" to ("Esri World Imagery (your own key)" to "Sharp, often under 1 m. Needs a free ArcGIS Location Platform account and API key " +
                     "(2 million tiles/month free, billed beyond that: check your account). The key stays on this phone."),
                 "CUSTOM" to ("Custom tile URL" to "Any XYZ imagery you're allowed to use. You're responsible for its terms."),
@@ -154,6 +160,22 @@ fun SettingsScreen(
                 }
             }
             when (imagerySource) {
+                "MAPTILER" -> {
+                    var key by remember(maptilerKey) { mutableStateOf(maptilerKey) }
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(key, { key = it }, label = { Text("MapTiler API key") }, singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { onMaptilerKey(key) }, enabled = key.isNotBlank() && key != maptilerKey) { Text("Test & save key") }
+                            TextButton(onClick = { key = ""; onMaptilerKey("") }, enabled = maptilerKey.isNotBlank()) { Text("Remove key") }
+                        }
+                        keyCheck?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+                            color = if (it.startsWith("Not saved")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) }
+                        if (maptilerKey.isBlank()) Text("Until a working key is saved, EOxCloudless is shown.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 "ESRI" -> {
                     var key by remember(esriKey) { mutableStateOf(esriKey) }
                     Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

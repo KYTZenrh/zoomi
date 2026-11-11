@@ -258,6 +258,13 @@ fun MapScreen(
                         RoundButton(R.drawable.ic_locate, "Follow my position", highlighted = true, onClick = { userPanned = false })
                     }
                 }
+                // Provider logo where the licence requires one (MapTiler free plan), above the credits.
+                imagery?.logoRes?.let { logo ->
+                    androidx.compose.foundation.Image(
+                        painterResource(logo), contentDescription = "MapTiler",
+                        modifier = insets.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 64.dp).size(width = 67.dp, height = 20.dp),
+                    )
+                }
                 Surface(
                     // Stays left of the round buttons so credits are never covered (Esri/EOX require that).
                     modifier = insets.align(Alignment.BottomStart).padding(start = 8.dp, end = 88.dp, bottom = 8.dp),

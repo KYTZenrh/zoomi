@@ -161,6 +161,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val esriKey: StateFlow<String> = settings.esriKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     fun setImagerySource(source: String) = viewModelScope.launch { settings.setImagerySource(source) }
     fun setEsriKey(key: String) = viewModelScope.launch { settings.setEsriKey(key) }
+    val maptilerKey: StateFlow<String> = settings.maptilerKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    private val _keyCheck = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    /** Result of the last key test, shown under the key field. */
+    val keyCheck: StateFlow<String?> = _keyCheck
+    /** Tests the key with one real tile before saving it; saves only if it works. */
+    fun saveMaptilerKey(key: String) = viewModelScope.launch {
+        if (key.isBlank()) { settings.setMaptilerKey("", 0); _keyCheck.value = null; return@launch }
+        _keyCheck.value = "Checking key…"
+        when (val r = com.zoomi.app.map.ImageryProbe.probe(com.zoomi.app.map.Imagery.mapTiler(key, 512).tileUrl)) {
+            is com.zoomi.app.map.ProbeResult.Ok -> { settings.setMaptilerKey(key, r.tileSize); _keyCheck.value = "Key works (${r.tileSize} px tiles)." }
+            is com.zoomi.app.map.ProbeResult.Failed -> _keyCheck.value = "Not saved: ${r.message}"
+        }
+    }
     fun setSatellite(on: Boolean) = viewModelScope.launch { settings.setSatellite(on) }
     fun setImagery(url: String, attribution: String) = viewModelScope.launch { settings.setImagery(url, attribution) }
     fun setValhallaUrl(url: String?) = viewModelScope.launch { settings.setValhallaUrl(url) }

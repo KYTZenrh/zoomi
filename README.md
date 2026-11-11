@@ -71,10 +71,20 @@ and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the
     showing no tunnel for 3 s, 8 s of accurate GPS (<= 25 m) when the map is unknown, or > 200 lux for 5 s.
   - Settings → "Why the theme is what it is now" shows the live inputs (sun elevation, lux, GPS age, tunnel).
 
-## Sharper satellite view (optional, your own Esri key)
+## Sharper satellite view (optional, your own free key)
 
 The free default imagery (EOxCloudless, Sentinel-2) is ~10 m per pixel and blurry at street level.
-For sharp imagery, use Esri World Imagery with **your own** free key (Zoomi ships no key):
+No sharp imagery is both keyless and licensed for apps like Zoomi (Google/Bing are off-limits, Esri's keyless
+endpoint isn't allowed for non-Esri apps). Two options with **your own** free key (Zoomi ships no key):
+
+**Recommended: MapTiler Satellite** (~1–2 m/px in Romania; 5–50 cm aerial in much of Western Europe)
+1. Create a free account at <https://www.maptiler.com> (free plan: personal/non-commercial, no credit card,
+   100,000 requests/month, then the service pauses until next month; it is never billed).
+2. Copy your API key from the account page.
+3. In Zoomi: Settings → Satellite view → *MapTiler Satellite* → paste → *Test & save key*. Zoomi downloads one
+   tile to confirm the key works before saving it. The map then shows the MapTiler logo and "© MapTiler" as required.
+
+**Sharper in some cities but may bill: Esri World Imagery**
 
 1. Create a free account at <https://location.arcgis.com> (ArcGIS Location Platform). Check its billing settings:
    the free tier is 2 million basemap tiles per month and usage beyond that is billed.

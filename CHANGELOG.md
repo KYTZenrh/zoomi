@@ -6,6 +6,8 @@
 - Satellite view (layers button on the map, or Settings → Satellite view): imagery under translucent roads
   and white labels. Default imagery EOxCloudless 2024 (Sentinel-2, ~10 m/pixel, CC BY-NC-SA 4.0, attribution
   shown on the map); blurry at street zoom. Optional custom XYZ imagery URL + attribution for sharper sources.
+- MapTiler Satellite preset (own free key, no card, never billed; ~1-2 m/px in Romania). The key is tested
+  with one real tile before saving, and the tile size is measured rather than guessed. MapTiler logo + credit on map.
 - Satellite imagery source choice: EOxCloudless (default), Esri World Imagery with your own ArcGIS key
   (sharp; "Powered by Esri" + data sources shown), or a custom XYZ URL.
 - Voice guidance settings: guidance language (phone / Română / English, applies to instruction text and voice),

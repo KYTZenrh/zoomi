@@ -181,6 +181,9 @@ class MainActivity : ComponentActivity() {
                             esriKey = vm.esriKey.collectAsStateWithLifecycle().value,
                             onImagerySource = vm::setImagerySource,
                             onEsriKey = vm::setEsriKey,
+                            maptilerKey = vm.maptilerKey.collectAsStateWithLifecycle().value,
+                            keyCheck = vm.keyCheck.collectAsStateWithLifecycle().value,
+                            onMaptilerKey = vm::saveMaptilerKey,
                             onBack = { screen = Screen.MAP },
                         )
                     }

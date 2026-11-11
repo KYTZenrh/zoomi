@@ -9,6 +9,8 @@ data class Imagery(
     val attribution: String,      // shown on the map, required by every imagery licence
     val maxZoom: Int = 19,
     val tileSize: Int = 256,
+    /** Provider logo that must be shown on the map (MapTiler free plan), or null. */
+    val logoRes: Int? = null,
 ) {
     companion object {
         /**
@@ -29,6 +31,22 @@ data class Imagery(
          * item's Acknowledgments (read 2026-11-12), unobstructed; the layer must not be exported for offline use.
          * Free tier: 2M basemap tiles/month on ArcGIS Location Platform, billed beyond that (check your account).
          */
+        /**
+         * MapTiler Satellite (dataset satellite-v2) with the user's OWN free MapTiler key.
+         * Free plan: personal/non-commercial use, no credit card, 100k requests/month and the service pauses
+         * (no billing) when used up. Romania: ~1-2 m/px (Maxar); 5-50 cm aerial in parts of Western Europe.
+         * Requires "© MapTiler" text and the MapTiler logo on the map (checked 2026-11-12).
+         * [tileSize] is measured from a real tile when the key is saved (see ImageryProbe).
+         */
+        fun mapTiler(apiKey: String, tileSize: Int) = Imagery(
+            tileUrl = "https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=" +
+                java.net.URLEncoder.encode(apiKey.trim(), "UTF-8"),
+            attribution = "© MapTiler",
+            maxZoom = 20,
+            tileSize = tileSize,
+            logoRes = com.zoomi.app.R.drawable.maptiler_logo,
+        )
+
         fun esri(apiKey: String) = Imagery(
             tileUrl = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=" +
                 java.net.URLEncoder.encode(apiKey.trim(), "UTF-8"),
