@@ -61,6 +61,8 @@ enum class CameraMode { FOLLOW, FREE, OVERVIEW, NAVIGATE }
 fun ZoomiMap(
     dark: Boolean,
     tilesUrl: String,
+    /** Non-null = satellite (hybrid) view with this imagery. */
+    imagery: Imagery?,
     puck: Puck?,
     cameraMode: CameraMode,
     courseUp: Boolean,
@@ -124,10 +126,11 @@ fun ZoomiMap(
     }
 
     // (Re)load style when the theme changes; our own layers are re-added each time.
-    LaunchedEffect(map, dark, tilesUrl) {
+    LaunchedEffect(map, dark, tilesUrl, imagery) {
         val m = map ?: return@LaunchedEffect
         style = null
-        val json = ZoomiMapStyle.json(if (dark) ZoomiMapStyle.DARK else ZoomiMapStyle.LIGHT, tilesUrl)
+        val base = ZoomiMapStyle.json(if (dark) ZoomiMapStyle.DARK else ZoomiMapStyle.LIGHT, tilesUrl)
+        val json = imagery?.let { SatelliteStyle.apply(base, it) } ?: base
         m.setStyle(Style.Builder().fromJson(json)) { s ->
             addOverlayLayers(s, density, brandColor, dark)
             style = s

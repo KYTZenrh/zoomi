@@ -87,6 +87,8 @@ class MainActivity : ComponentActivity() {
             val online by zoomi.network.online.collectAsStateWithLifecycle()
             val installed by regionsVm.installed.collectAsStateWithLifecycle()
             val estimated by vm.positionEstimated.collectAsStateWithLifecycle()
+            val satellite by vm.satellite.collectAsStateWithLifecycle()
+            val imagery by vm.imagery.collectAsStateWithLifecycle()
             // Inside a downloaded region the map is drawn from the local file (works offline, saves data).
             val mapRegion = remember(location?.latitude?.times(100)?.toInt(), location?.longitude?.times(100)?.toInt(), installed) {
                 location?.let { zoomi.regions.mapRegionAt(it.latitude, it.longitude) }
@@ -108,6 +110,8 @@ class MainActivity : ComponentActivity() {
                 MapScreen(
                     dark = dark,
                     tilesUrl = tilesUrl,
+                    imagery = if (satellite) imagery else null,
+                    onToggleSatellite = { vm.setSatellite(!satellite) },
                     online = online,
                     inRegion = mapRegion != null,
                     positionEstimated = estimated,
@@ -168,6 +172,11 @@ class MainActivity : ComponentActivity() {
                             onOpenAbout = { screen = Screen.ABOUT },
                             onOpenRegions = { screen = Screen.REGIONS },
                             onOpenVoice = { screen = Screen.VOICE },
+                            satellite = satellite,
+                            imageryUrl = vm.imageryCustomUrl.collectAsStateWithLifecycle().value,
+                            imageryAttribution = vm.imageryCustomAttribution.collectAsStateWithLifecycle().value,
+                            onSatellite = vm::setSatellite,
+                            onImagery = vm::setImagery,
                             onBack = { screen = Screen.MAP },
                         )
                     }

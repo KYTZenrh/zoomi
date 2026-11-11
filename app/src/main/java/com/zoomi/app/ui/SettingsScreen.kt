@@ -53,6 +53,11 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
     onOpenRegions: () -> Unit,
     onOpenVoice: () -> Unit,
+    satellite: Boolean,
+    imageryUrl: String,
+    imageryAttribution: String,
+    onSatellite: (Boolean) -> Unit,
+    onImagery: (String, String) -> Unit,
     onBack: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -115,6 +120,39 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
+
+            Section("Satellite view")
+            Row(
+                Modifier.fillMaxWidth().selectable(selected = satellite, onClick = { onSatellite(!satellite) }, role = Role.Switch)
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Show satellite imagery with roads and names", modifier = Modifier.weight(1f))
+                androidx.compose.material3.Switch(checked = satellite, onCheckedChange = null)
+            }
+            Text(
+                "Default imagery: EOxCloudless (Copernicus Sentinel-2, about 10 m per pixel). Free and needs no account, " +
+                    "but it's blurry up close: fine for seeing fields, forests and towns, not individual houses. Needs internet. " +
+                    "For sharper imagery you can enter a tile URL from a provider you have access to (e.g. your own free " +
+                    "ArcGIS key). You are responsible for that provider's terms.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            var imgUrl by remember(imageryUrl) { mutableStateOf(imageryUrl) }
+            var imgAttr by remember(imageryAttribution) { mutableStateOf(imageryAttribution) }
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(imgUrl, { imgUrl = it }, label = { Text("Custom tile URL with {z} {x} {y} (blank = EOxCloudless)") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(imgAttr, { imgAttr = it }, label = { Text("Attribution required by that provider") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                val valid = imgUrl.isBlank() || (imgUrl.startsWith("https://") && "{z}" in imgUrl && "{x}" in imgUrl && "{y}" in imgUrl && imgAttr.isNotBlank())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { onImagery(imgUrl, imgAttr) }, enabled = valid && (imgUrl != imageryUrl || imgAttr != imageryAttribution)) { Text("Save") }
+                    TextButton(onClick = { imgUrl = ""; imgAttr = ""; onImagery("", "") }, enabled = imageryUrl.isNotBlank()) { Text("Use EOxCloudless") }
+                }
+                if (!valid) Text("Needs https://, {z} {x} {y} and an attribution.", color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+            }
 
             Section("Servers")
             ServerField(

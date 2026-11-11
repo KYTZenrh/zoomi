@@ -29,6 +29,9 @@ class SettingsRepository(private val context: Context) {
     private val voiceMutedKey = booleanPreferencesKey("voice_muted")
     private val placesKey = stringPreferencesKey("saved_places")
     private val catalogKey = stringPreferencesKey("region_catalog_url")
+    private val satelliteKey = booleanPreferencesKey("map_satellite")
+    private val imageryUrlKey = stringPreferencesKey("imagery_url")
+    private val imageryAttrKey = stringPreferencesKey("imagery_attribution")
     private val guidanceLangKey = stringPreferencesKey("guidance_language")
     private val ttsEngineKey = stringPreferencesKey("tts_engine")
     private val ttsVoiceKey = stringPreferencesKey("tts_voice")
@@ -47,6 +50,15 @@ class SettingsRepository(private val context: Context) {
     /** Speech engine package (null = phone default) and voice name (null = engine default for the language). */
     val ttsEngine: Flow<String?> = context.dataStore.data.map { it[ttsEngineKey] }
     val ttsVoice: Flow<String?> = context.dataStore.data.map { it[ttsVoiceKey] }
+    val satellite: Flow<Boolean> = context.dataStore.data.map { it[satelliteKey] ?: false }
+    /** Custom imagery source (XYZ template + attribution); blank = EOxCloudless default. */
+    val imagery: Flow<com.zoomi.app.map.Imagery> = context.dataStore.data.map { p ->
+        val url = p[imageryUrlKey]
+        if (url.isNullOrBlank()) com.zoomi.app.map.Imagery.EOX
+        else com.zoomi.app.map.Imagery(url, p[imageryAttrKey]?.ifBlank { null } ?: "Imagery: custom source")
+    }
+    val imageryCustomUrl: Flow<String> = context.dataStore.data.map { it[imageryUrlKey] ?: "" }
+    val imageryCustomAttribution: Flow<String> = context.dataStore.data.map { it[imageryAttrKey] ?: "" }
     val catalogUrl: Flow<String> = context.dataStore.data.map { it[catalogKey] ?: "" }
     val savedPlaces: Flow<List<SavedPlace>> = context.dataStore.data.map { SavedPlaces.decode(it[placesKey]) }
 
@@ -60,6 +72,11 @@ class SettingsRepository(private val context: Context) {
     }
     suspend fun setCatalogUrl(url: String) = context.dataStore.edit {
         if (url.isBlank()) it.remove(catalogKey) else it[catalogKey] = url.trim()
+    }
+    suspend fun setSatellite(on: Boolean) = context.dataStore.edit { it[satelliteKey] = on }
+    suspend fun setImagery(url: String, attribution: String) = context.dataStore.edit {
+        if (url.isBlank()) { it.remove(imageryUrlKey); it.remove(imageryAttrKey) }
+        else { it[imageryUrlKey] = url.trim(); it[imageryAttrKey] = attribution.trim() }
     }
     suspend fun setGuidanceLanguage(l: com.zoomi.app.nav.GuidanceLanguage) = context.dataStore.edit {
         it[guidanceLangKey] = l.name

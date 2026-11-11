@@ -113,6 +113,7 @@ Install on a phone with USB debugging enabled: `adb install -r app/build/outputs
 | valhalla-mobile (Rallista) 0.6.4 / Valhalla 3.9.1 | on-device routing | MIT |
 | Planetiler 0.10.2 (OpenMapTiles profile) | building offline map files | Apache-2.0 (tool); output ODbL |
 | Natural Earth | low-zoom map data in offline files | public domain |
+| EOxCloudless 2024 (EOX IT Services GmbH), tiles.maps.eox.at | satellite view imagery | CC BY-NC-SA 4.0 for non-commercial use; attribution "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024)" shown on the map |
 | Noto Sans glyphs (bundled) | map labels | SIL Open Font License 1.1 (`app/src/main/assets/glyphs/OFL.txt`) |
 
 Attribution is visible on the map (bottom-left "© OpenStreetMap") and in Settings → About.
@@ -135,6 +136,10 @@ Attribution is visible on the map (bottom-left "© OpenStreetMap") and in Settin
 This section will be updated, before release, for every milestone that adds a network feature.
 
 ## Known limitations
+
+- Satellite view: the free default (Sentinel-2) is ~10 m per pixel: good for landscapes, blurry for streets and houses,
+  unlike Google's sub-metre imagery. Free sharp imagery for apps isn't available without an account/key
+  (e.g. Esri World Imagery needs an ArcGIS account; Google/Bing/Mapbox are paid or restricted). Online only.
 
 - Public transport: online only, coverage varies by city/operator, no turn-by-turn, no ticket prices.
 - Before a public release, set a contact in the User-Agent (`-Pzoomi.contact=...`): Transitous and FOSSGIS require one.

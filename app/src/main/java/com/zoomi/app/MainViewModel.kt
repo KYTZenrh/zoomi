@@ -152,6 +152,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         settings.valhallaUrl.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.data.SettingsRepository.DEFAULT_VALHALLA)
     val photonUrl: StateFlow<String> =
         settings.photonUrl.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.data.SettingsRepository.DEFAULT_PHOTON)
+    val satellite: StateFlow<Boolean> = settings.satellite.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val imagery: StateFlow<com.zoomi.app.map.Imagery> =
+        settings.imagery.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.map.Imagery.EOX)
+    val imageryCustomUrl: StateFlow<String> = settings.imageryCustomUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val imageryCustomAttribution: StateFlow<String> = settings.imageryCustomAttribution.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun setSatellite(on: Boolean) = viewModelScope.launch { settings.setSatellite(on) }
+    fun setImagery(url: String, attribution: String) = viewModelScope.launch { settings.setImagery(url, attribution) }
     fun setValhallaUrl(url: String?) = viewModelScope.launch { settings.setValhallaUrl(url) }
     fun setPhotonUrl(url: String?) = viewModelScope.launch { settings.setPhotonUrl(url) }
 

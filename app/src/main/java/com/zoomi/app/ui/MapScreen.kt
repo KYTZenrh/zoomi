@@ -54,6 +54,8 @@ import kotlin.math.roundToInt
 fun MapScreen(
     dark: Boolean,
     tilesUrl: String,
+    imagery: com.zoomi.app.map.Imagery?,
+    onToggleSatellite: () -> Unit,
     online: Boolean,
     inRegion: Boolean,
     positionEstimated: Boolean,
@@ -134,6 +136,7 @@ fun MapScreen(
         ZoomiMap(
             dark = dark,
             tilesUrl = tilesUrl,
+            imagery = imagery,
             puck = puck,
             cameraMode = cameraMode,
             courseUp = courseUp,
@@ -248,6 +251,8 @@ fun MapScreen(
                         rotation = if (courseUp) -(course ?: 0f) else 0f,
                         onClick = onToggleCourseUp,
                     )
+                    RoundButton(R.drawable.ic_layers, if (imagery != null) "Map view (tap for standard)" else "Satellite view",
+                        highlighted = imagery != null, onClick = onToggleSatellite)
                     RoundButton(R.drawable.ic_settings, "Settings", onClick = onOpenSettings)
                     if (userPanned) {
                         RoundButton(R.drawable.ic_locate, "Follow my position", highlighted = true, onClick = { userPanned = false })
@@ -259,7 +264,8 @@ fun MapScreen(
                     shape = RoundedCornerShape(6.dp),
                     onClick = onOpenAbout,
                 ) {
-                    Text("© OpenStreetMap", fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    Text("© OpenStreetMap" + if (imagery != null) " · " + imagery.attribution else "",
+                        fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
             }
         }
