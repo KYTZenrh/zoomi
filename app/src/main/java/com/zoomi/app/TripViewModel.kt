@@ -111,7 +111,14 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
             navState.collect { s ->
                 _speedLimit.value = if ((_trip.value as? TripUi.Navigating)?.mode == com.zoomi.core.nav.TravelMode.CAR) nav.speedLimit(s) else null
                 val current = _trip.value
-                if (current is TripUi.Navigating && s.tripState is TripState.Complete) {
+                val fix = z.gnss.location.value
+                val nearDestination = current is TripUi.Navigating && fix != null && com.zoomi.core.nav.Arrival.arrived(
+                    current.mode,
+                    com.zoomi.core.location.LatLon(fix.latitude, fix.longitude),
+                    com.zoomi.core.location.LatLon(current.destination.lat, current.destination.lon),
+                    fix.takeIf { it.hasAccuracy() }?.accuracy?.toDouble(),
+                )
+                if (current is TripUi.Navigating && (s.tripState is TripState.Complete || nearDestination)) {
                     _trip.value = TripUi.Arrived(current.destination)
                     nav.stop()
                 }

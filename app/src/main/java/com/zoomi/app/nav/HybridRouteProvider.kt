@@ -84,7 +84,14 @@ class HybridRouteProvider(
                 val req = adapter.generateRequest(userLocation, waypoints) as RouteRequest.HttpPost
                 val points = listOf(userLocation.coordinates.lat to userLocation.coordinates.lng) +
                     waypoints.map { it.coordinate.lat to it.coordinate.lng }
-                val (answer, source) = run(req.url, String(req.body), points) { e, body -> e.routeRaw(body) }
+                val mode = when (costing) {
+                    "bicycle" -> com.zoomi.core.nav.TravelMode.BIKE
+                    "pedestrian" -> com.zoomi.core.nav.TravelMode.WALK
+                    else -> com.zoomi.core.nav.TravelMode.CAR
+                }
+                // Let Valhalla choose among nearby paths at start/end instead of the single nearest one.
+                val body = com.zoomi.core.nav.RouteTuning.tune(String(req.body), mode, userLocation.horizontalAccuracy)
+                val (answer, source) = run(req.url, body, points) { e, b -> e.routeRaw(b) }
                 errorOf(answer)?.let { throw it }
                 val routes = adapter.parseResponse(answer.toByteArray())
                 _lastSource.value = source

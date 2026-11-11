@@ -10,6 +10,10 @@
 
 ### Fixed
 - Driven part of the route stayed on the map; now only the road ahead is drawn while navigating.
+- Walking routes went past stairs and back / around the block at the destination: start and end now
+  let Valhalla choose among paths within the GPS accuracy (`radius`; walk/bike start = accuracy 5–40 m,
+  end 25 m; car start ≤ 15 m, end 10 m), and arrival is declared within 25 m (walk), 30 m (bike), 40 m (car)
+  of the destination with a decent GPS fix.
 - Route requests while stopped sent a stale GPS heading, making Valhalla start in the wrong direction and loop;
   heading is now only sent when moving (>= 4 m/s) with an accurate course.
 
