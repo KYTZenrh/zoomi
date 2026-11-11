@@ -6,12 +6,15 @@
 - Satellite view (layers button on the map, or Settings → Satellite view): imagery under translucent roads
   and white labels. Default imagery EOxCloudless 2024 (Sentinel-2, ~10 m/pixel, CC BY-NC-SA 4.0, attribution
   shown on the map); blurry at street zoom. Optional custom XYZ imagery URL + attribution for sharper sources.
+- Satellite imagery source choice: EOxCloudless (default), Esri World Imagery with your own ArcGIS key
+  (sharp; "Powered by Esri" + data sources shown), or a custom XYZ URL.
 - Voice guidance settings: guidance language (phone / Română / English, applies to instruction text and voice),
   speech engine choice (e.g. Samsung or Google), voice list per language with Test, "Get more voices".
   Android doesn't expose voice gender; it's only shown when the voice name states it.
 - GPS accuracy circle around the position arrow (scales with zoom, minimum halo size).
 
 ### Fixed
+- Map credits ran underneath the round buttons; they now wrap to the left of them at 12 sp.
 - Driven part of the route stayed on the map; now only the road ahead is drawn while navigating.
 - Walking routes went past stairs and back / around the block at the destination: start and end now
   let Valhalla choose among paths within the GPS accuracy (`radius`; walk/bike start = accuracy 5–40 m,

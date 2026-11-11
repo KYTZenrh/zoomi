@@ -71,6 +71,19 @@ and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the
     showing no tunnel for 3 s, 8 s of accurate GPS (<= 25 m) when the map is unknown, or > 200 lux for 5 s.
   - Settings → "Why the theme is what it is now" shows the live inputs (sun elevation, lux, GPS age, tunnel).
 
+## Sharper satellite view (optional, your own Esri key)
+
+The free default imagery (EOxCloudless, Sentinel-2) is ~10 m per pixel and blurry at street level.
+For sharp imagery, use Esri World Imagery with **your own** free key (Zoomi ships no key):
+
+1. Create a free account at <https://location.arcgis.com> (ArcGIS Location Platform). Check its billing settings:
+   the free tier is 2 million basemap tiles per month and usage beyond that is billed.
+2. In the developer dashboard, create an API key with the **basemaps** privilege.
+3. In Zoomi: Settings → Satellite view → *Esri World Imagery (your own key)* → paste the key → Save key.
+
+The key is stored only on the phone. Zoomi shows Esri's required credits ("Powered by Esri", data sources) on the map.
+Esri's terms don't allow exporting this imagery for offline use, so it's online only.
+
 ## Build
 
 Requirements: JDK 17+ (tested with Temurin 21.0.13), Android SDK with platforms `android-37.0` (compile) and `android-36` (target). Gradle 9.9.0 comes with the wrapper.

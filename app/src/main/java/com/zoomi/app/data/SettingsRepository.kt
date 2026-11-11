@@ -32,6 +32,8 @@ class SettingsRepository(private val context: Context) {
     private val satelliteKey = booleanPreferencesKey("map_satellite")
     private val imageryUrlKey = stringPreferencesKey("imagery_url")
     private val imageryAttrKey = stringPreferencesKey("imagery_attribution")
+    private val imagerySourceKey = stringPreferencesKey("imagery_source") // EOX | ESRI | CUSTOM
+    private val esriKeyKey = stringPreferencesKey("esri_api_key")
     private val guidanceLangKey = stringPreferencesKey("guidance_language")
     private val ttsEngineKey = stringPreferencesKey("tts_engine")
     private val ttsVoiceKey = stringPreferencesKey("tts_voice")
@@ -51,12 +53,22 @@ class SettingsRepository(private val context: Context) {
     val ttsEngine: Flow<String?> = context.dataStore.data.map { it[ttsEngineKey] }
     val ttsVoice: Flow<String?> = context.dataStore.data.map { it[ttsVoiceKey] }
     val satellite: Flow<Boolean> = context.dataStore.data.map { it[satelliteKey] ?: false }
-    /** Custom imagery source (XYZ template + attribution); blank = EOxCloudless default. */
+    /** Selected satellite imagery. Falls back to EOxCloudless when the chosen source isn't fully configured. */
     val imagery: Flow<com.zoomi.app.map.Imagery> = context.dataStore.data.map { p ->
         val url = p[imageryUrlKey]
-        if (url.isNullOrBlank()) com.zoomi.app.map.Imagery.EOX
-        else com.zoomi.app.map.Imagery(url, p[imageryAttrKey]?.ifBlank { null } ?: "Imagery: custom source")
+        val key = p[esriKeyKey]
+        when (p[imagerySourceKey] ?: if (!url.isNullOrBlank()) "CUSTOM" else "EOX") {
+            "ESRI" -> if (!key.isNullOrBlank()) com.zoomi.app.map.Imagery.esri(key) else com.zoomi.app.map.Imagery.EOX
+            "CUSTOM" -> if (!url.isNullOrBlank())
+                com.zoomi.app.map.Imagery(url, p[imageryAttrKey]?.ifBlank { null } ?: "Imagery: custom source")
+            else com.zoomi.app.map.Imagery.EOX
+            else -> com.zoomi.app.map.Imagery.EOX
+        }
     }
+    val imagerySource: Flow<String> = context.dataStore.data.map { p ->
+        p[imagerySourceKey] ?: if (!p[imageryUrlKey].isNullOrBlank()) "CUSTOM" else "EOX"
+    }
+    val esriKey: Flow<String> = context.dataStore.data.map { it[esriKeyKey] ?: "" }
     val imageryCustomUrl: Flow<String> = context.dataStore.data.map { it[imageryUrlKey] ?: "" }
     val imageryCustomAttribution: Flow<String> = context.dataStore.data.map { it[imageryAttrKey] ?: "" }
     val catalogUrl: Flow<String> = context.dataStore.data.map { it[catalogKey] ?: "" }
@@ -77,6 +89,11 @@ class SettingsRepository(private val context: Context) {
     suspend fun setImagery(url: String, attribution: String) = context.dataStore.edit {
         if (url.isBlank()) { it.remove(imageryUrlKey); it.remove(imageryAttrKey) }
         else { it[imageryUrlKey] = url.trim(); it[imageryAttrKey] = attribution.trim() }
+    }
+    suspend fun setImagerySource(source: String) = context.dataStore.edit { it[imagerySourceKey] = source }
+    /** Stored only on this phone (never synced, never in the repo). */
+    suspend fun setEsriKey(key: String) = context.dataStore.edit {
+        if (key.isBlank()) it.remove(esriKeyKey) else it[esriKeyKey] = key.trim()
     }
     suspend fun setGuidanceLanguage(l: com.zoomi.app.nav.GuidanceLanguage) = context.dataStore.edit {
         it[guidanceLangKey] = l.name

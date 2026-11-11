@@ -22,6 +22,19 @@ data class Imagery(
             attribution = "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024)",
             maxZoom = 14,
         )
+
+        /**
+         * Esri World Imagery with the user's OWN ArcGIS API key (Zoomi ships no key).
+         * Sharp (sub-metre in many places). Esri requires "Powered by Esri" plus the data sources from the
+         * item's Acknowledgments (read 2026-11-12), unobstructed; the layer must not be exported for offline use.
+         * Free tier: 2M basemap tiles/month on ArcGIS Location Platform, billed beyond that (check your account).
+         */
+        fun esri(apiKey: String) = Imagery(
+            tileUrl = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=" +
+                java.net.URLEncoder.encode(apiKey.trim(), "UTF-8"),
+            attribution = "Powered by Esri · Sources: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
+            maxZoom = 19,
+        )
     }
 }
 

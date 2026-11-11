@@ -259,13 +259,14 @@ fun MapScreen(
                     }
                 }
                 Surface(
-                    modifier = insets.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 8.dp),
+                    // Stays left of the round buttons so credits are never covered (Esri/EOX require that).
+                    modifier = insets.align(Alignment.BottomStart).padding(start = 8.dp, end = 88.dp, bottom = 8.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
                     shape = RoundedCornerShape(6.dp),
                     onClick = onOpenAbout,
                 ) {
                     Text("© OpenStreetMap" + if (imagery != null) " · " + imagery.attribution else "",
-                        fontSize = 11.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        fontSize = 12.sp, lineHeight = 14.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
             }
         }

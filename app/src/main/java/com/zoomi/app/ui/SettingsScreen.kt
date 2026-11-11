@@ -58,6 +58,10 @@ fun SettingsScreen(
     imageryAttribution: String,
     onSatellite: (Boolean) -> Unit,
     onImagery: (String, String) -> Unit,
+    imagerySource: String,
+    esriKey: String,
+    onImagerySource: (String) -> Unit,
+    onEsriKey: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -130,29 +134,58 @@ fun SettingsScreen(
                 Text("Show satellite imagery with roads and names", modifier = Modifier.weight(1f))
                 androidx.compose.material3.Switch(checked = satellite, onCheckedChange = null)
             }
-            Text(
-                "Default imagery: EOxCloudless (Copernicus Sentinel-2, about 10 m per pixel). Free and needs no account, " +
-                    "but it's blurry up close: fine for seeing fields, forests and towns, not individual houses. Needs internet. " +
-                    "For sharper imagery you can enter a tile URL from a provider you have access to (e.g. your own free " +
-                    "ArcGIS key). You are responsible for that provider's terms.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            var imgUrl by remember(imageryUrl) { mutableStateOf(imageryUrl) }
-            var imgAttr by remember(imageryAttribution) { mutableStateOf(imageryAttribution) }
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(imgUrl, { imgUrl = it }, label = { Text("Custom tile URL with {z} {x} {y} (blank = EOxCloudless)") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(imgAttr, { imgAttr = it }, label = { Text("Attribution required by that provider") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth())
-                val valid = imgUrl.isBlank() || (imgUrl.startsWith("https://") && "{z}" in imgUrl && "{x}" in imgUrl && "{y}" in imgUrl && imgAttr.isNotBlank())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { onImagery(imgUrl, imgAttr) }, enabled = valid && (imgUrl != imageryUrl || imgAttr != imageryAttribution)) { Text("Save") }
-                    TextButton(onClick = { imgUrl = ""; imgAttr = ""; onImagery("", "") }, enabled = imageryUrl.isNotBlank()) { Text("Use EOxCloudless") }
+            Text("Imagery source", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
+            listOf(
+                "EOX" to ("EOxCloudless (default)" to "Free, no account. About 10 m per pixel: good overview, blurry at street level."),
+                "ESRI" to ("Esri World Imagery (your own key)" to "Sharp, often under 1 m. Needs a free ArcGIS Location Platform account and API key " +
+                    "(2 million tiles/month free, billed beyond that: check your account). The key stays on this phone."),
+                "CUSTOM" to ("Custom tile URL" to "Any XYZ imagery you're allowed to use. You're responsible for its terms."),
+            ).forEach { (id, t) ->
+                Row(
+                    Modifier.fillMaxWidth().selectable(imagerySource == id, onClick = { onImagerySource(id) }, role = Role.RadioButton)
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = imagerySource == id, onClick = null, modifier = Modifier.padding(8.dp))
+                    Column {
+                        Text(t.first, style = MaterialTheme.typography.bodyLarge)
+                        Text(t.second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                if (!valid) Text("Needs https://, {z} {x} {y} and an attribution.", color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall)
             }
+            when (imagerySource) {
+                "ESRI" -> {
+                    var key by remember(esriKey) { mutableStateOf(esriKey) }
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(key, { key = it }, label = { Text("ArcGIS API key") }, singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { onEsriKey(key) }, enabled = key != esriKey) { Text("Save key") }
+                            TextButton(onClick = { key = ""; onEsriKey("") }, enabled = esriKey.isNotBlank()) { Text("Remove key") }
+                        }
+                        if (esriKey.isBlank()) Text("Until a key is saved, EOxCloudless is shown.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                "CUSTOM" -> {
+                    var imgUrl by remember(imageryUrl) { mutableStateOf(imageryUrl) }
+                    var imgAttr by remember(imageryAttribution) { mutableStateOf(imageryAttribution) }
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(imgUrl, { imgUrl = it }, label = { Text("Tile URL with {z} {x} {y}") },
+                            singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(imgAttr, { imgAttr = it }, label = { Text("Attribution required by that provider") },
+                            singleLine = true, modifier = Modifier.fillMaxWidth())
+                        val valid = imgUrl.startsWith("https://") && "{z}" in imgUrl && "{x}" in imgUrl && "{y}" in imgUrl && imgAttr.isNotBlank()
+                        TextButton(onClick = { onImagery(imgUrl, imgAttr) }, enabled = valid && (imgUrl != imageryUrl || imgAttr != imageryAttribution)) { Text("Save") }
+                        if (!valid) Text("Needs https://, {z} {x} {y} and an attribution.", color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Text("Satellite imagery needs internet; it isn't part of offline regions.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
 
             Section("Servers")
             ServerField(

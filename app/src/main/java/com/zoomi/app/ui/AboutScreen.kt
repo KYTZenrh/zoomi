@@ -31,6 +31,7 @@ private val credits = listOf(
     Credit("Transitous", "Public transport journeys (MOTIS 2), run by volunteers. Data from many transport operators; tap for the list of sources.", "https://transitous.org/sources/"),
     Credit("Support Transitous", "Transitous runs on donations.", "https://transitous.org/donate/"),
     Credit("EOxCloudless (satellite view)", "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024). CC BY-NC-SA 4.0 for non-commercial use.", "https://cloudless.eox.at/documentation/license"),
+    Credit("Esri World Imagery (optional, your own key)", "Powered by Esri. Sources: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Esri Master License Agreement.", "https://www.esri.com"),
     Credit("Ferrostar", "Navigation logic (progress, off-route detection, voice). BSD 3-Clause, Stadia Maps.", "https://github.com/stadiamaps/ferrostar"),
     Credit("OkHttp", "HTTP client, Apache License 2.0.", "https://square.github.io/okhttp/"),
     Credit("OpenMapTiles", "Vector tile schema, © OpenMapTiles (CC-BY 4.0).", "https://www.openmaptiles.org/"),
@@ -59,7 +60,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 "What leaves your phone: map tiles from tiles.openfreemap.org (reveals the area you view); " +
                     "search text and your position rounded to ~1 km to the search server; the start and destination " +
                     "of each route you request to the routing server; start and destination of public transport searches to Transitous. " +
-                    "In satellite view, imagery tiles from tiles.maps.eox.at (or your custom source), which reveals the area you view. " +
+                    "In satellite view, imagery tiles from tiles.maps.eox.at, or from Esri / your custom source if you chose one, which reveals the area you view. " +
                     "Every server also sees your IP address. " +
                     "Zoomi itself stores nothing on any server. Saved places stay on this phone.",
                 style = MaterialTheme.typography.bodySmall,

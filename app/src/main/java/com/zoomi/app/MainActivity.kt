@@ -177,6 +177,10 @@ class MainActivity : ComponentActivity() {
                             imageryAttribution = vm.imageryCustomAttribution.collectAsStateWithLifecycle().value,
                             onSatellite = vm::setSatellite,
                             onImagery = vm::setImagery,
+                            imagerySource = vm.imagerySource.collectAsStateWithLifecycle().value,
+                            esriKey = vm.esriKey.collectAsStateWithLifecycle().value,
+                            onImagerySource = vm::setImagerySource,
+                            onEsriKey = vm::setEsriKey,
                             onBack = { screen = Screen.MAP },
                         )
                     }

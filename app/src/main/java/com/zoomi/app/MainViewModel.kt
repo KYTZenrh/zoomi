@@ -157,6 +157,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         settings.imagery.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.map.Imagery.EOX)
     val imageryCustomUrl: StateFlow<String> = settings.imageryCustomUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val imageryCustomAttribution: StateFlow<String> = settings.imageryCustomAttribution.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val imagerySource: StateFlow<String> = settings.imagerySource.stateIn(viewModelScope, SharingStarted.Eagerly, "EOX")
+    val esriKey: StateFlow<String> = settings.esriKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun setImagerySource(source: String) = viewModelScope.launch { settings.setImagerySource(source) }
+    fun setEsriKey(key: String) = viewModelScope.launch { settings.setEsriKey(key) }
     fun setSatellite(on: Boolean) = viewModelScope.launch { settings.setSatellite(on) }
     fun setImagery(url: String, attribution: String) = viewModelScope.launch { settings.setImagery(url, attribution) }
     fun setValhallaUrl(url: String?) = viewModelScope.launch { settings.setValhallaUrl(url) }
