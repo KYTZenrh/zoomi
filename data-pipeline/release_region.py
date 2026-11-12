@@ -23,6 +23,51 @@ def sha256(path):
     return h.hexdigest()
 
 
+def read_poly(path, tolerance=0.005):
+    """Geofabrik .poly -> [{"hole": bool, "ring": [lon, lat, ...]}], simplified (Douglas-Peucker, degrees)."""
+    rings, cur, hole = [], None, False
+    with open(path, encoding="utf-8") as f:
+        lines = [l.strip() for l in f][1:]  # first line: name
+    for l in lines:
+        if not l:
+            continue
+        if cur is None:
+            if l == "END":
+                break
+            hole, cur = l.startswith("!"), []
+        elif l == "END":
+            rings.append({"hole": hole, "ring": cur})
+            cur = None
+        else:
+            x, y = l.split()[:2]
+            cur.append((float(x), float(y)))
+
+    def dp(pts):
+        if len(pts) < 3:
+            return pts
+        (x1, y1), (x2, y2) = pts[0], pts[-1]
+        dx, dy = x2 - x1, y2 - y1
+        n = (dx * dx + dy * dy) ** 0.5
+        best, idx = -1.0, 0
+        for i in range(1, len(pts) - 1):
+            px, py = pts[i]
+            d = abs(dy * px - dx * py + x2 * y1 - y2 * x1) / n if n else ((px - x1) ** 2 + (py - y1) ** 2) ** 0.5
+            if d > best:
+                best, idx = d, i
+        if best <= tolerance:
+            return [pts[0], pts[-1]]
+        return dp(pts[: idx + 1])[:-1] + dp(pts[idx:])
+
+    out = []
+    for r in rings:
+        pts = r["ring"]
+        half = len(pts) // 2  # split closed rings so the end points differ
+        simple = dp(pts[: half + 1])[:-1] + dp(pts[half:])
+        if len(simple) >= 4:
+            out.append({"hole": r["hole"], "ring": [round(v, 4) for p in simple for v in p]})
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--id", required=True)
@@ -35,6 +80,7 @@ def main():
     ap.add_argument("--base-url", required=True, help="URL prefix of the release assets")
     ap.add_argument("--out", required=True)
     ap.add_argument("--split-mb", type=int, default=1900)
+    ap.add_argument("--poly", default=None, help="Geofabrik .poly border, so the app knows exactly which country you are in")
     a = ap.parse_args()
 
     os.makedirs(a.out, exist_ok=True)
@@ -74,6 +120,8 @@ def main():
 
     region = {"id": a.id, "name": a.name, "group": a.group, "bbox": bbox, "osmDate": a.osm_date,
               "valhallaVersion": a.valhalla_version, "files": files}
+    if a.poly:
+        region["area"] = read_poly(a.poly)
     with open(os.path.join(a.out, f"{a.id}.region.json"), "w", encoding="utf-8") as f:
         json.dump(region, f, ensure_ascii=False, indent=1)
     print(json.dumps(region, indent=1))

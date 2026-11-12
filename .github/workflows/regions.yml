@@ -86,11 +86,14 @@ jobs:
           echo "${VALHALLA_WHEEL_SHA256}  pyvalhalla-3.9.1-cp312-abi3-manylinux_2_28_x86_64.whl" | sha256sum -c -
           pip install --no-deps ./pyvalhalla-3.9.1-cp312-abi3-manylinux_2_28_x86_64.whl
       - name: OSM extract
+        env:
+          PBF_URL: ${{ matrix.pbf }}
         run: |
           curl -fsSL -A "zoomi-region-builder (+https://github.com/${{ github.repository }})" -o region.osm.pbf "${{ matrix.pbf }}"
           curl -fsSL -A "zoomi-region-builder" "${{ matrix.pbf }}.md5" | awk '{print $1"  region.osm.pbf"}' | md5sum -c -
           date -u -d "$(curl -fsSI '${{ matrix.pbf }}' | grep -i '^last-modified:' | cut -d' ' -f2- | tr -d '\r')" +%F > osm-date.txt
-          ls -l region.osm.pbf; cat osm-date.txt
+          curl -fsSL -A "zoomi-region-builder" -o region.poly "${PBF_URL%-latest.osm.pbf}.poly"
+          ls -l region.osm.pbf region.poly; cat osm-date.txt
       - name: Map tiles (Planetiler, OpenMapTiles schema)
         run: java -Xmx10g -jar planetiler.jar --osm-path=region.osm.pbf --output=map.pmtiles --storage=mmap --nodemap-type=sparsearray --force
       - name: Routing tiles (Valhalla)
@@ -105,7 +108,7 @@ jobs:
       - name: Package and upload
         run: |
           python data-pipeline/release_region.py --id "${{ matrix.id }}" --name "${{ matrix.name }}" --group "${{ matrix.group }}" \
-            --osm-date "$(cat osm-date.txt)" --map map.pmtiles --routing routing.tar --valhalla-version "$VALHALLA_VERSION" \
+            --osm-date "$(cat osm-date.txt)" --map map.pmtiles --routing routing.tar --valhalla-version "$VALHALLA_VERSION" --poly region.poly \
             --base-url "https://github.com/${{ github.repository }}/releases/download/regions" --out out
           ls -l out
           gh release upload regions out/* --clobber
