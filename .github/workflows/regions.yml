@@ -111,7 +111,9 @@ jobs:
             --osm-date "$(cat osm-date.txt)" --map map.pmtiles --routing routing.tar --valhalla-version "$VALHALLA_VERSION" --poly region.poly \
             --base-url "https://github.com/${{ github.repository }}/releases/download/regions" --out out
           ls -l out
-          gh release upload regions out/* --clobber
+          # GitHub sometimes answers "release not found" for a moment; retry.
+          for i in 1 2 3 4 5; do gh release upload regions out/* --clobber && break; echo "upload failed, retry $i"; sleep $((i * 20)); done
+          gh release view regions --json assets --jq '.assets[].name' | grep -qx "${{ matrix.id }}.region.json"
 
   catalog:
     needs: build
@@ -125,4 +127,4 @@ jobs:
           mkdir cat
           gh release download regions -p '*.region.json' -D cat
           python3 data-pipeline/merge_catalog.py cat catalog.json
-          gh release upload regions catalog.json --clobber
+          for i in 1 2 3 4 5; do gh release upload regions catalog.json --clobber && break; sleep $((i * 20)); done
