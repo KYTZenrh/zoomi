@@ -80,7 +80,8 @@ fun RegionsScreen(
             Body("Map and routing without internet. Search still needs a connection.")
 
             // Suggestion: the country you're in.
-            val mine = here?.let { (lat, lon) -> RegionManifests.covering(catalog.regions, listOf(lat to lon)) }
+            // Only regions with a real border: a bounding box can't tell Iasi (Romania) from Moldova.
+            val mine = here?.let { (lat, lon) -> RegionManifests.covering(catalog.regions.filter { it.area != null }, listOf(lat to lon)) }
             if (mine != null && !isInstalled(mine)) {
                 Surface(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),

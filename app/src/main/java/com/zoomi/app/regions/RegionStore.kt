@@ -39,8 +39,10 @@ class RegionStore(context: Context) {
 
     /** Region whose map covers this point (smallest first). */
     fun mapRegionAt(lat: Double, lon: Double): InstalledRegion? =
-        _installed.value.filter { it.mapFile != null && it.manifest.contains(lat, lon) }
-            .minByOrNull { (it.manifest.bbox.maxLon - it.manifest.bbox.minLon) * (it.manifest.bbox.maxLat - it.manifest.bbox.minLat) }
+        _installed.value.filter { it.mapFile != null }.let { list ->
+            val m = com.zoomi.core.regions.RegionManifests.covering(list.map { it.manifest }, listOf(lat to lon))
+            list.firstOrNull { it.manifest.id == m?.id }
+        }
 
     /** Region with routing data covering all points. */
     fun routingRegionFor(points: List<Pair<Double, Double>>): InstalledRegion? {

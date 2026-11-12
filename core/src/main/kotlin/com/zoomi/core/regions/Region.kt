@@ -138,5 +138,7 @@ object RegionManifests {
     /** The region to use for a set of points: the smallest one containing all of them. */
     fun covering(regions: List<RegionManifest>, points: List<Pair<Double, Double>>): RegionManifest? =
         regions.filter { r -> points.all { (lat, lon) -> r.contains(lat, lon) } }
-            .minByOrNull { (it.bbox.maxLon - it.bbox.minLon) * (it.bbox.maxLat - it.bbox.minLat) }
+            // A real border beats a bounding box (boxes of neighbours overlap); then the smallest.
+            .minWithOrNull(compareBy<RegionManifest> { if (it.area != null) 0 else 1 }
+                .thenBy { (it.bbox.maxLon - it.bbox.minLon) * (it.bbox.maxLat - it.bbox.minLat) })
 }
