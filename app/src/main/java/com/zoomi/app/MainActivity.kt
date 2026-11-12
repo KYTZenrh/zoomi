@@ -47,6 +47,9 @@ class MainActivity : ComponentActivity() {
     private val notificationLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { tripVm.startNavigation() }
 
+    private val importFilesLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> regionsVm.importFiles(uris) }
+
     private val importLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> uri?.let(regionsVm::importFrom) }
 
@@ -237,6 +240,7 @@ class MainActivity : ComponentActivity() {
                             progress = progress,
                             import = importState,
                             onImport = { importLauncher.launch(null) },
+                            onImportFiles = { importFilesLauncher.launch(arrayOf("*/*")) },
                             onCancelImport = regionsVm::cancelImport,
                             onCatalogUrl = regionsVm::setCatalogUrl,
                             onLoadCatalog = regionsVm::loadCatalog,

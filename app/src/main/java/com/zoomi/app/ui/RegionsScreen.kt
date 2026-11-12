@@ -60,6 +60,7 @@ fun RegionsScreen(
     /** Current position, to suggest the country you're in. */
     here: Pair<Double, Double>?,
     onImport: () -> Unit,
+    onImportFiles: () -> Unit,
     onCancelImport: () -> Unit,
     onCatalogUrl: (String) -> Unit,
     onLoadCatalog: () -> Unit,
@@ -172,7 +173,9 @@ fun RegionsScreen(
                         TextButton(onClick = { onCatalogUrl(url) }, enabled = url != catalogUrl) { Text("Save") }
                         TextButton(onClick = { onCatalogUrl("") }) { Text("Reset to default") }
                     }
-                    Text("Import a region folder copied to the phone", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+                    Text("Add maps from files", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+                    Text("Get a country's files from the regions page on GitHub, then pick its .region.json, map and routing files together.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (import.running) {
                         if (import.total > 0) {
                             LinearProgressIndicator(progress = { (import.done.toFloat() / import.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
@@ -180,7 +183,10 @@ fun RegionsScreen(
                         }
                         TextButton(onClick = onCancelImport) { Text("Cancel import") }
                     } else {
-                        OutlinedButton(onClick = onImport) { Text("Choose folder…") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = onImportFiles) { Text("Choose files…") }
+                            TextButton(onClick = onImport) { Text("Choose folder…") }
+                        }
                     }
                     import.message?.let { Text(it, color = if (import.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) }
                 }

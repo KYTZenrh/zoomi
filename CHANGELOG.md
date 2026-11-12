@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Offline maps → Advanced → Choose files…: import countries from the files on the regions release page
+  (picked together straight from Downloads; split pieces are joined; several countries at once). Folder import still works.
+
 ## [1.0.0] 2026-11-12
 
 ### Added

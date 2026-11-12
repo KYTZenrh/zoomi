@@ -27,12 +27,15 @@ class RegionsViewModel(app: Application) : AndroidViewModel(app) {
     val importState: StateFlow<ImportUi> = _import.asStateFlow()
     private var importJob: kotlinx.coroutines.Job? = null
 
-    fun importFrom(uri: android.net.Uri) {
+    fun importFrom(uri: android.net.Uri) = runImport { p -> importer.import(uri, p) }
+    fun importFiles(uris: List<android.net.Uri>) { if (uris.isNotEmpty()) runImport { p -> importer.importFiles(uris, p) } }
+
+    private fun runImport(block: suspend ((Long, Long) -> Unit) -> String) {
         if (importJob?.isActive == true) return
         importJob = viewModelScope.launch {
             _import.value = ImportUi(running = true)
             _import.value = try {
-                val name = importer.import(uri) { d, t -> _import.value = ImportUi(running = true, done = d, total = t) }
+                val name = block { d, t -> _import.value = ImportUi(running = true, done = d, total = t) }
                 ImportUi(message = "$name imported.")
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

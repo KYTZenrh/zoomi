@@ -18,7 +18,10 @@ phone and allow "install unknown apps" for your browser or file manager when And
   country by continent ("Download all" per continent). Each package has the map and the road network for offline routes,
   built from OpenStreetMap by this repository's GitHub Actions workflow (`.github/workflows/regions.yml`) and hosted as
   files of the [regions release](https://github.com/KYTZenrh/zoomi/releases/tag/regions). More continents can be built
-  from the Actions tab (Run workflow → continent).
+  from the Actions tab (Run workflow → continent). Without using the phone's data: download a country's three files
+  (`<id>.region.json`, `<id>-map.pmtiles`, `<id>-routing.tar`, plus `.001`, `.002` … pieces for very big countries)
+  from the regions release on a computer, copy them to the phone, then Offline maps → Advanced → Choose files… and
+  select them together (several countries at once work too).
 - **Dark colours in tunnels and underground:** while navigating, the route itself says where tunnels are, so the map
   turns dark at the portal (the way big navigation apps do it); in underground car parks it turns dark when GPS is
   lost and it's very dark right after driving. Outside navigation, the mapped tunnel under you plus lost GPS or darkness.
