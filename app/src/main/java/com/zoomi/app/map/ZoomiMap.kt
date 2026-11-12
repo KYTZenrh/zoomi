@@ -70,6 +70,8 @@ fun ZoomiMap(
     selectedRoute: Int,
     destination: LatLng?,
     brandColor: Int,
+    /** Position arrow + accuracy circle colour. */
+    puckColor: Int,
     overviewPaddingBottomPx: Int,
     onUserPanned: () -> Unit,
     onTunnelRoad: (Boolean?) -> Unit,
@@ -126,13 +128,13 @@ fun ZoomiMap(
     }
 
     // (Re)load style when the theme changes; our own layers are re-added each time.
-    LaunchedEffect(map, dark, tilesUrl, imagery) {
+    LaunchedEffect(map, dark, tilesUrl, imagery, puckColor) {
         val m = map ?: return@LaunchedEffect
         style = null
         val base = ZoomiMapStyle.json(if (dark) ZoomiMapStyle.DARK else ZoomiMapStyle.LIGHT, tilesUrl)
         val json = imagery?.let { SatelliteStyle.apply(base, it) } ?: base
         m.setStyle(Style.Builder().fromJson(json)) { s ->
-            addOverlayLayers(s, density, brandColor, dark)
+            addOverlayLayers(s, density, brandColor, puckColor, dark)
             style = s
         }
     }
@@ -200,8 +202,8 @@ fun ZoomiMap(
     AndroidView(factory = { mapView }, modifier = modifier)
 }
 
-private fun addOverlayLayers(s: Style, density: Float, brandColor: Int, dark: Boolean) {
-    s.addImage(PuckIcons.ARROW, PuckIcons.arrow(density, brandColor))
+private fun addOverlayLayers(s: Style, density: Float, brandColor: Int, puckColor: Int, dark: Boolean) {
+    s.addImage(PuckIcons.ARROW, PuckIcons.arrow(density, puckColor))
     s.addSource(GeoJsonSource(ROUTE_SOURCE))
     s.addSource(GeoJsonSource(DEST_SOURCE))
     s.addSource(GeoJsonSource(PUCK_SOURCE))
@@ -253,9 +255,9 @@ private fun addOverlayLayers(s: Style, density: Float, brandColor: Int, dark: Bo
                     ),
                 )
             ),
-            PropertyFactory.circleColor(brandColor),
+            PropertyFactory.circleColor(puckColor),
             PropertyFactory.circleOpacity(0.15f),
-            PropertyFactory.circleStrokeColor(brandColor),
+            PropertyFactory.circleStrokeColor(puckColor),
             PropertyFactory.circleStrokeOpacity(0.45f),
             PropertyFactory.circleStrokeWidth(1.5f),
             PropertyFactory.circlePitchAlignment(Property.CIRCLE_PITCH_ALIGNMENT_MAP),
@@ -263,7 +265,7 @@ private fun addOverlayLayers(s: Style, density: Float, brandColor: Int, dark: Bo
     )
     s.addLayer(
         CircleLayer(PUCK_DOT, PUCK_SOURCE).withProperties(
-            PropertyFactory.circleRadius(9f), PropertyFactory.circleColor(brandColor),
+            PropertyFactory.circleRadius(9f), PropertyFactory.circleColor(puckColor),
             PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE), PropertyFactory.circleStrokeWidth(3f),
         ).withFilter(Expression.not(Expression.has("bearing")))
     )

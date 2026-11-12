@@ -27,13 +27,55 @@ class TunnelDetectorTest {
         assertTrue(d.update(inp(3_000, 10f, 200, true)))
     }
 
-    @Test fun neverEntersWithoutMapEvidence() {
+    /** Darkness alone (sun visor, phone in a holder) never switches while GPS still works. */
+    @Test fun neverEntersOnDarknessWithWorkingGps() {
         val d = TunnelDetector()
         d.driveUpTo(0)
         for (t in 1_000L..60_000L step 1_000) {
-            assertFalse(d.update(inp(t, 1f, 10_000, null)))
-            assertFalse(d.update(inp(t, 1f, 10_000, false)))
+            assertFalse(d.update(inp(t, 1f, 300, null)))
+            assertFalse(d.update(inp(t, 1f, 300, false)))
         }
+    }
+
+    /** Losing GPS in daylight (urban canyon) is not "underground". */
+    @Test fun gpsLossInDaylightIsNotUnderground() {
+        val d = TunnelDetector()
+        d.driveUpTo(0)
+        for (t in 1_000L..30_000L step 1_000) assertFalse(d.update(inp(t, 3000f, 10_000, null)))
+    }
+
+    /** Driving into an underground car park: no tunnel in the map, but GPS gone and very dark. */
+    @Test fun entersUndergroundWhenGpsLostAndVeryDark() {
+        val d = TunnelDetector()
+        d.driveUpTo(0)
+        assertFalse(d.update(inp(2_000, 5f, 2_000, null)))
+        assertFalse(d.update(inp(4_000, 5f, 4_000, null)))
+        assertTrue(d.update(inp(6_000, 5f, 6_000, null)))
+        // Back outside in daylight: bright light with fresh GPS ends it after 5 s.
+        for (t in 20_000L until 25_000L step 1_000) assertTrue(d.update(inp(t, 5000f, 300, null, acc = 8f)))
+        assertFalse(d.update(inp(25_000, 5000f, 300, null, acc = 8f)))
+    }
+
+    @Test fun undergroundNeedsRecentDriving() {
+        val d = TunnelDetector()
+        for (t in 0L..60_000L step 1_000) assertFalse(d.update(inp(t, 2f, 20_000, null, speed = 0f)))
+    }
+
+    /** Navigation route says "tunnel here": switch at the portal even though GPS still works. */
+    @Test fun entersImmediatelyWhenRouteSaysTunnel() {
+        val d = TunnelDetector()
+        d.driveUpTo(0)
+        assertTrue(d.update(inp(1_000, 5000f, 200, null).copy(routeTunnel = true)))
+        // Bright light and good GPS inside the tunnel (lit tunnel, GPS repeaters) don't end it.
+        for (t in 2_000L..30_000L step 1_000) assertTrue(d.update(inp(t, 5000f, 200, null, acc = 5f).copy(routeTunnel = true)))
+        // Route says out, GPS fresh and daylight: back to day within seconds.
+        d.update(inp(31_000, 5000f, 200, null).copy(routeTunnel = false))
+        assertFalse(d.update(inp(34_000, 5000f, 200, null).copy(routeTunnel = false)))
+    }
+
+    @Test fun routeTunnelNeedsMotion() {
+        val d = TunnelDetector()
+        for (t in 0L..20_000L step 1_000) assertFalse(d.update(inp(t, 5000f, 200, null, speed = 0f).copy(routeTunnel = true)))
     }
 
     /** Regression: phone indoors (29 lux), stationary, next to a mapped underpass. Seen on device 2026-11-09. */

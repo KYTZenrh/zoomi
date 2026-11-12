@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.0] 2026-11-12
+
+### Added
+- Settings reorganised into categories (Map, Navigation, Offline maps, Advanced, About) with short descriptions.
+- Offline maps for any country: catalog of country packages (map + routing) built by GitHub Actions from Geofabrik
+  extracts with real sea polygons, hosted as `regions` release files; split files (> 1.9 GB) download in parts; the
+  country you're in is suggested (real border polygons, so overlapping bounding boxes like Romania/Moldova are handled);
+  continents with "Download all" (two downloads at a time); "update available" for newer data.
+- Tunnel / underground dark theme: navigation route tunnel stretches (trace_attributes) switch at the portal; underground
+  car parks via lost GPS + very low light after driving. 10 new unit tests.
+- Position colour choice (7 colours, equal OKLCH lightness to the brand violet).
+- Route options: avoid tolls / motorways / ferries (soft preferences). Speed alert beep (5 km/h over for 3 s, max once a minute).
+- Defaults: MapTiler satellite source, Google speech engine (when installed), Europe region catalog.
+- Signed release builds (ARM only), version 1.0.0.
+
 ## [Unreleased] after field test (2026-11-11)
 
 ### Added

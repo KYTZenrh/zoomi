@@ -84,6 +84,9 @@ class MainActivity : ComponentActivity() {
             val speedLimit by tripVm.speedLimit.collectAsStateWithLifecycle()
             val muted by tripVm.voiceMuted.collectAsStateWithLifecycle()
             var screen by rememberSaveable { mutableStateOf(Screen.MAP) }
+            var aboutReturn by rememberSaveable { mutableStateOf(Screen.MAP) }
+            var settingsPage by rememberSaveable { mutableStateOf(com.zoomi.app.ui.SettingsPage.HOME) }
+            val puckColor by vm.puckColor.collectAsStateWithLifecycle()
             val online by zoomi.network.online.collectAsStateWithLifecycle()
             val installed by regionsVm.installed.collectAsStateWithLifecycle()
             val estimated by vm.positionEstimated.collectAsStateWithLifecycle()
@@ -129,7 +132,7 @@ class MainActivity : ComponentActivity() {
                     onTunnelRoad = { vm.onTunnelRoad = it },
                     onOpenSearch = { screen = Screen.SEARCH },
                     onOpenSettings = { screen = Screen.SETTINGS },
-                    onOpenAbout = { screen = Screen.ABOUT },
+                    onOpenAbout = { aboutReturn = Screen.MAP; screen = Screen.ABOUT },
                     onLongPress = { lat, lon -> tripVm.chooseMapPoint(lat, lon) },
                     onMode = tripVm::setMode,
                     onSelectRoute = tripVm::selectRoute,
@@ -139,6 +142,7 @@ class MainActivity : ComponentActivity() {
                     onCloseTrip = tripVm::endTrip,
                     onToggleMute = { tripVm.setVoiceMuted(!muted) },
                     onShareEta = ::shareEta,
+                    puckColor = puckColor,
                 )
                 if (navigating) BackHandler { /* don't leave navigation by accident; use End */ }
                 else if (trip !is TripUi.Idle && screen == Screen.MAP) BackHandler { tripVm.endTrip() }
@@ -158,32 +162,50 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     Screen.SETTINGS -> {
-                        BackHandler { screen = Screen.MAP }
+                        if (settingsPage == com.zoomi.app.ui.SettingsPage.HOME) BackHandler { screen = Screen.MAP }
                         SettingsScreen(
-                            mode = mode,
-                            decision = decision,
-                            diagnostics = diagnostics,
-                            lightSensorAvailable = hasLightSensor,
-                            valhallaUrl = valhallaUrl,
-                            photonUrl = photonUrl,
-                            onModeChange = vm::setThemeMode,
-                            onValhallaUrl = vm::setValhallaUrl,
-                            onPhotonUrl = vm::setPhotonUrl,
-                            onOpenAbout = { screen = Screen.ABOUT },
-                            onOpenRegions = { screen = Screen.REGIONS },
-                            onOpenVoice = { screen = Screen.VOICE },
-                            satellite = satellite,
-                            imageryUrl = vm.imageryCustomUrl.collectAsStateWithLifecycle().value,
-                            imageryAttribution = vm.imageryCustomAttribution.collectAsStateWithLifecycle().value,
-                            onSatellite = vm::setSatellite,
-                            onImagery = vm::setImagery,
-                            imagerySource = vm.imagerySource.collectAsStateWithLifecycle().value,
-                            esriKey = vm.esriKey.collectAsStateWithLifecycle().value,
-                            onImagerySource = vm::setImagerySource,
-                            onEsriKey = vm::setEsriKey,
-                            maptilerKey = vm.maptilerKey.collectAsStateWithLifecycle().value,
-                            keyCheck = vm.keyCheck.collectAsStateWithLifecycle().value,
-                            onMaptilerKey = vm::saveMaptilerKey,
+                            page = settingsPage,
+                            onPage = { settingsPage = it },
+                            v = com.zoomi.app.ui.SettingsValues(
+                                mode = mode,
+                                decision = decision,
+                                diagnostics = diagnostics,
+                                lightSensorAvailable = hasLightSensor,
+                                puckColor = puckColor,
+                                satellite = satellite,
+                                imagerySource = vm.imagerySource.collectAsStateWithLifecycle().value,
+                                maptilerKey = vm.maptilerKey.collectAsStateWithLifecycle().value,
+                                keyCheck = vm.keyCheck.collectAsStateWithLifecycle().value,
+                                esriKey = vm.esriKey.collectAsStateWithLifecycle().value,
+                                imageryUrl = vm.imageryCustomUrl.collectAsStateWithLifecycle().value,
+                                imageryAttribution = vm.imageryCustomAttribution.collectAsStateWithLifecycle().value,
+                                avoidTolls = vm.avoidTolls.collectAsStateWithLifecycle().value,
+                                avoidHighways = vm.avoidHighways.collectAsStateWithLifecycle().value,
+                                avoidFerries = vm.avoidFerries.collectAsStateWithLifecycle().value,
+                                speedAlert = vm.speedAlert.collectAsStateWithLifecycle().value,
+                                valhallaUrl = valhallaUrl,
+                                photonUrl = photonUrl,
+                            ),
+                            a = remember {
+                                com.zoomi.app.ui.SettingsActions(
+                                    onModeChange = { vm.setThemeMode(it) },
+                                    onPuckColor = { vm.setPuckColor(it) },
+                                    onSatellite = { vm.setSatellite(it) },
+                                    onImagerySource = { vm.setImagerySource(it) },
+                                    onMaptilerKey = { vm.saveMaptilerKey(it) },
+                                    onEsriKey = { vm.setEsriKey(it) },
+                                    onImagery = { u, at -> vm.setImagery(u, at) },
+                                    onAvoidTolls = { vm.setAvoidTolls(it) },
+                                    onAvoidHighways = { vm.setAvoidHighways(it) },
+                                    onAvoidFerries = { vm.setAvoidFerries(it) },
+                                    onSpeedAlert = { vm.setSpeedAlert(it) },
+                                    onValhallaUrl = { vm.setValhallaUrl(it) },
+                                    onPhotonUrl = { vm.setPhotonUrl(it) },
+                                    onOpenVoice = { screen = Screen.VOICE },
+                                    onOpenRegions = { screen = Screen.REGIONS },
+                                    onOpenAbout = { aboutReturn = Screen.SETTINGS; screen = Screen.ABOUT },
+                                )
+                            },
                             onBack = { screen = Screen.MAP },
                         )
                     }
@@ -206,7 +228,9 @@ class MainActivity : ComponentActivity() {
                         val catalog by regionsVm.catalog.collectAsStateWithLifecycle()
                         val progress by regionsVm.progress.collectAsStateWithLifecycle()
                         val importState by regionsVm.importState.collectAsStateWithLifecycle()
+                        LaunchedEffect(Unit) { if (catalog.regions.isEmpty() && !catalog.loading) regionsVm.loadCatalog() }
                         RegionsScreen(
+                            here = location?.let { it.latitude to it.longitude },
                             installed = installed,
                             catalogUrl = catalogUrl,
                             catalog = catalog,
@@ -219,13 +243,12 @@ class MainActivity : ComponentActivity() {
                             onDownload = regionsVm::download,
                             onCancel = regionsVm::cancel,
                             onDelete = regionsVm::delete,
-                            onRescan = regionsVm::rescan,
                             onBack = { screen = Screen.SETTINGS },
                         )
                     }
                     Screen.ABOUT -> {
-                        BackHandler { screen = Screen.MAP }
-                        AboutScreen(onBack = { screen = Screen.MAP })
+                        BackHandler { screen = aboutReturn }
+                        AboutScreen(onBack = { screen = aboutReturn })
                     }
                 }
             }

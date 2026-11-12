@@ -39,7 +39,7 @@ class RegionStore(context: Context) {
 
     /** Region whose map covers this point (smallest first). */
     fun mapRegionAt(lat: Double, lon: Double): InstalledRegion? =
-        _installed.value.filter { it.mapFile != null && it.manifest.bbox.contains(lat, lon) }
+        _installed.value.filter { it.mapFile != null && it.manifest.contains(lat, lon) }
             .minByOrNull { (it.manifest.bbox.maxLon - it.manifest.bbox.minLon) * (it.manifest.bbox.maxLat - it.manifest.bbox.minLat) }
 
     /** Region with routing data covering all points. */

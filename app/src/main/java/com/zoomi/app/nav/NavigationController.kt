@@ -91,6 +91,10 @@ class NavigationController(
 
     /** Updated from settings. */
     @Volatile var valhallaUrl: String = SettingsRepository.DEFAULT_VALHALLA
+    /** Route preferences (soft: Valhalla still uses a toll road / motorway / ferry if there's no other way). */
+    @Volatile var avoidTolls = false
+    @Volatile var avoidHighways = false
+    @Volatile var avoidFerries = false
 
     val language: String get() = ValhallaLocale.pick(VoiceCatalog.languageTag(guidanceLanguage))
 
@@ -102,6 +106,18 @@ class NavigationController(
                 put("alternates", 2)
                 put("units", "kilometers")
                 put("language", language)
+                if (avoidTolls || avoidHighways || avoidFerries) put("costing_options", buildJsonObject {
+                    val prefs = buildJsonObject {
+                        if (avoidTolls) put("use_tolls", 0.0)
+                        if (avoidHighways) put("use_highways", 0.0)
+                        if (avoidFerries) put("use_ferry", 0.0)
+                    }
+                    put("auto", prefs)
+                    if (avoidFerries) {
+                        put("bicycle", buildJsonObject { put("use_ferry", 0.0) })
+                        put("pedestrian", buildJsonObject { put("use_ferry", 0.0) })
+                    }
+                })
             }.toString()
         },
         isOnline = { network.online.value },
@@ -154,6 +170,12 @@ class NavigationController(
         val shape = route.geometry.map { com.zoomi.core.location.LatLon(it.lat, it.lng) }
         val text = routeProvider.traceAttributes(shape)
         return com.zoomi.core.nav.Crossings.summarize(com.zoomi.core.nav.Crossings.parseTraceAttributes(text))
+    }
+
+    /** Tunnel stretches along a route geometry (for switching to dark colours at the portal). */
+    suspend fun routeTunnels(points: List<com.zoomi.core.location.LatLon>): com.zoomi.core.theme.RouteTunnels {
+        val edges = com.zoomi.core.nav.Crossings.parseTraceAttributes(routeProvider.traceAttributes(points))
+        return com.zoomi.core.theme.RouteTunnels(points, edges)
     }
 
     fun stop() {

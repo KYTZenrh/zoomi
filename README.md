@@ -2,8 +2,29 @@
 
 Free, open-source navigation for Android. No ads, no tracking, no Google Play Services.
 
-**Status: milestone (d), car / bike / walk / public transport and water crossings.** Accounts, alerts
-and traffic are planned (see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
+**Version 1.0.0.** Car / bike / walk navigation online and offline, public transport, satellite view and
+downloadable offline maps for every country in Europe. Accounts, crowd alerts and live traffic are planned
+(see Roadmap) and **not in the app yet**. Nothing in the app is a placeholder.
+
+## Install
+
+Download `Zoomi-1.0.0.apk` from the [latest release](https://github.com/KYTZenrh/zoomi/releases/latest), open it on your
+phone and allow "install unknown apps" for your browser or file manager when Android asks. Android 10 or newer, ARM phones.
+
+## New in 1.0.0
+
+- **Settings in categories:** Map, Navigation, Offline maps, Advanced, About.
+- **Offline maps for any country in Europe:** Settings → Offline maps suggests the country you're in and lists every
+  country by continent ("Download all" per continent). Each package has the map and the road network for offline routes,
+  built from OpenStreetMap by this repository's GitHub Actions workflow (`.github/workflows/regions.yml`) and hosted as
+  files of the [regions release](https://github.com/KYTZenrh/zoomi/releases/tag/regions). More continents can be built
+  from the Actions tab (Run workflow → continent).
+- **Dark colours in tunnels and underground:** while navigating, the route itself says where tunnels are, so the map
+  turns dark at the portal (the way big navigation apps do it); in underground car parks it turns dark when GPS is
+  lost and it's very dark right after driving. Outside navigation, the mapped tunnel under you plus lost GPS or darkness.
+- **Position colour:** 7 colours of equal lightness for the arrow and accuracy circle.
+- **Route options:** avoid tolls, motorways, ferries. **Speed alert:** a short beep when over the limit (where OSM has it).
+
 
 ## What works now
 
@@ -113,11 +134,12 @@ Install on a phone with USB debugging enabled: `adb install -r app/build/outputs
 ## Signing your own release APK
 
 1. Create a key once (keep it safe; losing it means users must uninstall to update):
-   `keytool -genkeypair -v -keystore zoomi-release.jks -alias zoomi -keyalg RSA -keysize 4096 -validity 10000`
-2. Build: `./gradlew :app:assembleRelease`
-3. Sign: `apksigner sign --ks zoomi-release.jks --out zoomi.apk app/build/outputs/apk/release/app-release-unsigned.apk`
-   (`apksigner` is in the SDK `build-tools/<version>/` folder; run `zipalign -p 4` first if your build-tools version requires it.)
-4. Upload `zoomi.apk` to a GitHub Release. Never commit the `.jks` file.
+   `keytool -genkeypair -keystore zoomi-release.jks -storetype PKCS12 -alias zoomi -keyalg RSA -keysize 4096 -validity 36500`
+2. Create `keystore.properties` next to `settings.gradle.kts` (git-ignored) with `storeFile=`, `storePassword=`,
+   `keyAlias=zoomi`, `keyPassword=`.
+3. Build: `./gradlew :app:assembleRelease` gives a signed `app/build/outputs/apk/release/app-release.apk` (ARM only).
+4. Optional private build with your own MapTiler key preset: `-Pzoomi.maptilerKey=...` (don't publish that APK:
+   anyone can read the key out of it).
 
 ## Data sources and attribution
 
@@ -167,26 +189,22 @@ This section will be updated, before release, for every milestone that adds a ne
 - Public transport: online only, coverage varies by city/operator, no turn-by-turn, no ticket prices.
 - Before a public release, set a contact in the User-Agent (`-Pzoomi.contact=...`): Transitous and FOSSGIS require one.
 
-- Zoomi doesn't host region files yet (needs a public host; planned with the first release / server milestone).
-  Today: build them with `data-pipeline/`, copy the folder to the phone (e.g. Downloads) and import it, or point the app at
-  your own catalog URL.
-- The first Romania map build has **no open-sea polygons** (osmdata.openstreetmap.de was unreachable); the Black Sea
-  shows as land colour in offline mode. Lakes and rivers are fine. Will be rebuilt.
+- Offline maps: Europe is built; other continents only after someone runs the workflow for them. Countries whose
+  files are too big for a free GitHub runner may fail to build (reported in the Actions log). Offline routes work
+  inside one country at a time (no cross-border offline routing); online routing has no such limit.
 - Search needs internet (no offline address search yet).
 - Dead reckoning needs a route (navigation active); outside navigation the dot simply stays put during GPS loss.
   It assumes constant speed, so in a long tunnel with traffic the estimate runs ahead or behind until GPS returns.
 - Gyro heading drifts a few degrees per minute while turning slowly without GPS; it resets on the next good GPS course.
-- Debug APK is ~133 MB (native map, Ferrostar and Valhalla engines for 4 CPU types).
+- The release APK is ARM only; the debug APK (~133 MB) also has x86 libraries for emulators.
 
-- Car only. Bike, walking, public transport and the "no road route / water crossing" dialog come in milestone (d).
 - ETAs don't include live traffic (milestone g), so rush-hour estimates will be optimistic.
 - Default servers are community-run with strict limits (1 req/s). Fine for personal use and testing; a public release
   should use Zoomi's own routing server (planned on Oracle Always Free at milestone e). FOSSGIS also requires an operator
   contact email on the app's website before public distribution.
 - Speed limits and lane arrows only appear where OpenStreetMap has `maxspeed` / `turn:lanes`.
-- Voice language follows the phone's system language; quality depends on the installed Android TTS voice.
-- Heading: no gyro fusion or dead reckoning yet (milestone c). At start-up you get a dot until you drive.
-- Tunnel detection depends on OSM having the road tagged `tunnel=yes` and on the map following you.
+- Voice quality depends on the installed Android speech engine (Google's by default when installed).
+- Tunnel colours depend on OSM having the road tagged `tunnel=yes`; underground car parks rely on lost GPS + darkness.
 - The light sensor on most phones faces the screen side; in a mount it may be shaded. That's why it never switches the theme alone.
 
 ## Roadmap

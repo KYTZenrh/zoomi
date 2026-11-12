@@ -33,6 +33,7 @@ private val credits = listOf(
     Credit("EOxCloudless (satellite view)", "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024). CC BY-NC-SA 4.0 for non-commercial use.", "https://cloudless.eox.at/documentation/license"),
     Credit("MapTiler Satellite (optional, your own key)", "© MapTiler. Imagery: NASA Blue Marble, Copernicus Sentinel-2, Maxar and aerial sources (maptiler.com/copyright).", "https://www.maptiler.com/copyright/"),
     Credit("Esri World Imagery (optional, your own key)", "Powered by Esri. Sources: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Esri Master License Agreement.", "https://www.esri.com"),
+    Credit("Offline maps", "Built from Geofabrik OpenStreetMap extracts with Planetiler (Apache-2.0) and Valhalla. Includes Natural Earth (public domain) and OSM water polygons (ODbL). Hosted as GitHub release files.", "https://download.geofabrik.de/"),
     Credit("Ferrostar", "Navigation logic (progress, off-route detection, voice). BSD 3-Clause, Stadia Maps.", "https://github.com/stadiamaps/ferrostar"),
     Credit("OkHttp", "HTTP client, Apache License 2.0.", "https://square.github.io/okhttp/"),
     Credit("OpenMapTiles", "Vector tile schema, © OpenMapTiles (CC-BY 4.0).", "https://www.openmaptiles.org/"),
@@ -62,6 +63,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     "search text and your position rounded to ~1 km to the search server; the start and destination " +
                     "of each route you request to the routing server; start and destination of public transport searches to Transitous. " +
                     "In satellite view, imagery tiles from tiles.maps.eox.at, or from MapTiler / Esri / your custom source if you chose one, which reveals the area you view. " +
+                    "Offline map downloads come from github.com. " +
                     "Every server also sees your IP address. " +
                     "Zoomi itself stores nothing on any server. Saved places stay on this phone.",
                 style = MaterialTheme.typography.bodySmall,

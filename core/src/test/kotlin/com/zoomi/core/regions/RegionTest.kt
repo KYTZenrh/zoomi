@@ -58,4 +58,30 @@ class RegionTest {
         assertEquals(1, RegionManifests.parseCatalog("""{"regions":[$ro, {"id":"bad"}]}""").size)
         assertEquals(0, RegionManifests.parseCatalog("nope").size)
     }
+
+    /** Regression: Iasi is inside Moldova's bbox; with real borders Romania must win. */
+    @Test fun areaBeatsOverlappingBbox() {
+        fun region(id: String, bbox: String, ring: String, size: Long = 1) = RegionManifests.parseOne(
+            """{"id":"$id","bbox":$bbox,"files":[{"name":"map.pmtiles","url":"u","size":$size}],
+               "area":[{"hole":false,"ring":$ring}]}"""
+        )!!
+        // Simplified boxes: Romania west of the Prut (lon 27.0-28.2 near Iasi), Moldova east of it.
+        val ro = region("romania", "[20.2,43.6,30.3,48.3]", "[20.2,43.6, 28.2,43.6, 28.2,48.3, 20.2,48.3]")
+        val md = region("moldova", "[26.6,45.4,30.2,48.5]", "[28.2,45.4, 30.2,45.4, 30.2,48.5, 28.2,48.5]")
+        val iasi = 47.16 to 27.59
+        assertEquals("romania", RegionManifests.covering(listOf(ro, md), listOf(iasi))?.id)
+        assertEquals("moldova", RegionManifests.covering(listOf(ro, md), listOf(47.0 to 28.86))?.id) // Chisinau
+        val back = RegionManifests.parseOne(RegionManifests.encode(ro))!!
+        assertEquals(ro.area, back.area)
+    }
+
+    @Test fun holeIsExcluded() {
+        val r = RegionManifests.parseOne(
+            """{"id":"za","bbox":[0,0,10,10],"files":[{"name":"map.pmtiles","url":"u"}],
+               "area":[{"hole":false,"ring":[0,0,10,0,10,10,0,10]},{"hole":true,"ring":[4,4,6,4,6,6,4,6]}]}"""
+        )!!
+        assertEquals(true, r.contains(1.0, 1.0))
+        assertEquals(false, r.contains(5.0, 5.0))
+        assertNull(RegionManifests.covering(listOf(r), listOf(5.0 to 5.0)))
+    }
 }

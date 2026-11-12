@@ -29,6 +29,7 @@ data class ThemeDiagnostics(
     val fixAgeMs: Long? = null,
     val onTunnelRoad: Boolean? = null,
     val inTunnel: Boolean = false,
+    val routeTunnel: Boolean? = null,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -109,6 +110,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             systemDark = systemDark,
             speedMps = loc?.takeIf { it.hasSpeed() }?.speed,
             accuracyM = loc?.takeIf { it.hasAccuracy() }?.accuracy,
+            routeTunnel = engine.position.value?.let { p ->
+                getApplication<ZoomiApplication>().routeTunnels.value?.at(com.zoomi.core.location.LatLon(p.latitude, p.longitude))
+            },
         )
         _decision.value = controller.decide(themeMode.value, input)
         _diagnostics.value = ThemeDiagnostics(
@@ -117,6 +121,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             fixAgeMs = fixAge,
             onTunnelRoad = onTunnelRoad,
             inTunnel = controller.inTunnel,
+            routeTunnel = input.routeTunnel,
         )
     }
 
@@ -178,6 +183,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setImagery(url: String, attribution: String) = viewModelScope.launch { settings.setImagery(url, attribution) }
     fun setValhallaUrl(url: String?) = viewModelScope.launch { settings.setValhallaUrl(url) }
     fun setPhotonUrl(url: String?) = viewModelScope.launch { settings.setPhotonUrl(url) }
+
+    val puckColor: StateFlow<com.zoomi.app.map.PuckColor> =
+        settings.puckColor.stateIn(viewModelScope, SharingStarted.Eagerly, com.zoomi.app.map.PuckColor.VIOLET)
+    val avoidTolls: StateFlow<Boolean> = settings.avoidTolls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val avoidHighways: StateFlow<Boolean> = settings.avoidHighways.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val avoidFerries: StateFlow<Boolean> = settings.avoidFerries.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val speedAlert: StateFlow<Boolean> = settings.speedAlert.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    fun setPuckColor(c: com.zoomi.app.map.PuckColor) = viewModelScope.launch { settings.setPuckColor(c) }
+    fun setAvoidTolls(v: Boolean) = viewModelScope.launch { settings.setAvoidTolls(v) }
+    fun setAvoidHighways(v: Boolean) = viewModelScope.launch { settings.setAvoidHighways(v) }
+    fun setAvoidFerries(v: Boolean) = viewModelScope.launch { settings.setAvoidFerries(v) }
+    fun setSpeedAlert(v: Boolean) = viewModelScope.launch { settings.setSpeedAlert(v) }
+
+    init { viewModelScope.launch { settings.seedBuildDefaults(BuildConfig.MAPTILER_KEY) } }
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settings.setThemeMode(mode) }
     fun setCourseUp(value: Boolean) = viewModelScope.launch { settings.setCourseUp(value) }

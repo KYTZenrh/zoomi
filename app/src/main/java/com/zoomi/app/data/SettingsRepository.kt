@@ -20,6 +20,11 @@ class SettingsRepository(private val context: Context) {
         const val DEFAULT_VALHALLA = "https://valhalla1.openstreetmap.de/route"
         /** komoot's public Photon server: fair use. */
         const val DEFAULT_PHOTON = "https://photon.komoot.io"
+        /** Offline regions built by this repository's GitHub Actions workflow (release "regions"). */
+        const val DEFAULT_CATALOG = "https://github.com/KYTZenrh/zoomi/releases/download/regions/catalog.json"
+        /** Google's speech engine if installed (Android falls back to the phone default otherwise). */
+        const val DEFAULT_TTS_ENGINE = "com.google.android.tts"
+        const val DEFAULT_IMAGERY = "MAPTILER"
     }
 
     private val themeKey = stringPreferencesKey("theme_mode")
@@ -39,6 +44,12 @@ class SettingsRepository(private val context: Context) {
     private val guidanceLangKey = stringPreferencesKey("guidance_language")
     private val ttsEngineKey = stringPreferencesKey("tts_engine")
     private val ttsVoiceKey = stringPreferencesKey("tts_voice")
+    private val puckColorKey = stringPreferencesKey("puck_color")
+    private val avoidTollsKey = booleanPreferencesKey("avoid_tolls")
+    private val avoidHighwaysKey = booleanPreferencesKey("avoid_highways")
+    private val avoidFerriesKey = booleanPreferencesKey("avoid_ferries")
+    private val speedAlertKey = booleanPreferencesKey("speed_alert")
+    private val seededKey = booleanPreferencesKey("seeded_build_defaults")
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO
@@ -52,14 +63,17 @@ class SettingsRepository(private val context: Context) {
             ?: com.zoomi.app.nav.GuidanceLanguage.AUTO
     }
     /** Speech engine package (null = phone default) and voice name (null = engine default for the language). */
-    val ttsEngine: Flow<String?> = context.dataStore.data.map { it[ttsEngineKey] }
+    val ttsEngine: Flow<String?> = context.dataStore.data.map { p ->
+        // "" = the user picked "Phone default"; missing = Zoomi's default engine.
+        (p[ttsEngineKey] ?: DEFAULT_TTS_ENGINE).ifBlank { null }
+    }
     val ttsVoice: Flow<String?> = context.dataStore.data.map { it[ttsVoiceKey] }
     val satellite: Flow<Boolean> = context.dataStore.data.map { it[satelliteKey] ?: false }
     /** Selected satellite imagery. Falls back to EOxCloudless when the chosen source isn't fully configured. */
     val imagery: Flow<com.zoomi.app.map.Imagery> = context.dataStore.data.map { p ->
         val url = p[imageryUrlKey]
         val key = p[esriKeyKey]
-        when (p[imagerySourceKey] ?: if (!url.isNullOrBlank()) "CUSTOM" else "EOX") {
+        when (p[imagerySourceKey] ?: DEFAULT_IMAGERY) {
             "ESRI" -> if (!key.isNullOrBlank()) com.zoomi.app.map.Imagery.esri(key) else com.zoomi.app.map.Imagery.EOX
             "MAPTILER" -> p[maptilerKeyKey]?.takeIf { it.isNotBlank() }
                 ?.let { com.zoomi.app.map.Imagery.mapTiler(it, p[maptilerTileSizeKey] ?: 512) } ?: com.zoomi.app.map.Imagery.EOX
@@ -70,13 +84,20 @@ class SettingsRepository(private val context: Context) {
         }
     }
     val imagerySource: Flow<String> = context.dataStore.data.map { p ->
-        p[imagerySourceKey] ?: if (!p[imageryUrlKey].isNullOrBlank()) "CUSTOM" else "EOX"
+        p[imagerySourceKey] ?: DEFAULT_IMAGERY
     }
+    val puckColor: Flow<com.zoomi.app.map.PuckColor> = context.dataStore.data.map { p ->
+        p[puckColorKey]?.let { runCatching { com.zoomi.app.map.PuckColor.valueOf(it) }.getOrNull() } ?: com.zoomi.app.map.PuckColor.VIOLET
+    }
+    val avoidTolls: Flow<Boolean> = context.dataStore.data.map { it[avoidTollsKey] ?: false }
+    val avoidHighways: Flow<Boolean> = context.dataStore.data.map { it[avoidHighwaysKey] ?: false }
+    val avoidFerries: Flow<Boolean> = context.dataStore.data.map { it[avoidFerriesKey] ?: false }
+    val speedAlert: Flow<Boolean> = context.dataStore.data.map { it[speedAlertKey] ?: true }
     val esriKey: Flow<String> = context.dataStore.data.map { it[esriKeyKey] ?: "" }
     val maptilerKey: Flow<String> = context.dataStore.data.map { it[maptilerKeyKey] ?: "" }
     val imageryCustomUrl: Flow<String> = context.dataStore.data.map { it[imageryUrlKey] ?: "" }
     val imageryCustomAttribution: Flow<String> = context.dataStore.data.map { it[imageryAttrKey] ?: "" }
-    val catalogUrl: Flow<String> = context.dataStore.data.map { it[catalogKey] ?: "" }
+    val catalogUrl: Flow<String> = context.dataStore.data.map { it[catalogKey] ?: DEFAULT_CATALOG }
     val savedPlaces: Flow<List<SavedPlace>> = context.dataStore.data.map { SavedPlaces.decode(it[placesKey]) }
 
     suspend fun setThemeMode(mode: ThemeMode) = context.dataStore.edit { it[themeKey] = mode.name }
@@ -110,10 +131,29 @@ class SettingsRepository(private val context: Context) {
         it.remove(ttsVoiceKey) // a voice belongs to one language
     }
     suspend fun setTtsEngine(pkg: String?) = context.dataStore.edit {
-        if (pkg == null) it.remove(ttsEngineKey) else it[ttsEngineKey] = pkg
+        it[ttsEngineKey] = pkg ?: "" // "" = phone default (kept, so the Zoomi default doesn't come back)
         it.remove(ttsVoiceKey)
     }
     suspend fun setTtsVoice(name: String?) = context.dataStore.edit { if (name == null) it.remove(ttsVoiceKey) else it[ttsVoiceKey] = name }
+    suspend fun setPuckColor(c: com.zoomi.app.map.PuckColor) = context.dataStore.edit { it[puckColorKey] = c.name }
+    suspend fun setAvoidTolls(v: Boolean) = context.dataStore.edit { it[avoidTollsKey] = v }
+    suspend fun setAvoidHighways(v: Boolean) = context.dataStore.edit { it[avoidHighwaysKey] = v }
+    suspend fun setAvoidFerries(v: Boolean) = context.dataStore.edit { it[avoidFerriesKey] = v }
+    suspend fun setSpeedAlert(v: Boolean) = context.dataStore.edit { it[speedAlertKey] = v }
+
+    /**
+     * A personal build can carry a MapTiler key (local.properties, never in the repo). Save it once on
+     * first start, so it stays after updating to a build without the key.
+     */
+    suspend fun seedBuildDefaults(maptilerKey: String) = context.dataStore.edit {
+        if (it[seededKey] == true) return@edit
+        if (maptilerKey.isNotBlank() && it[maptilerKeyKey].isNullOrBlank()) {
+            it[maptilerKeyKey] = maptilerKey
+            it[maptilerTileSizeKey] = 512
+        }
+        it[seededKey] = true
+    }
+
     suspend fun setVoiceMuted(value: Boolean) = context.dataStore.edit { it[voiceMutedKey] = value }
 
     suspend fun updatePlaces(transform: (List<SavedPlace>) -> List<SavedPlace>) = context.dataStore.edit {

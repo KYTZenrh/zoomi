@@ -69,6 +69,7 @@ data class SearchUi(
 class TripViewModel(app: Application) : AndroidViewModel(app) {
     private val z = app.zoomi
     private val nav = z.navigation
+    private val speedAlert = com.zoomi.app.nav.SpeedAlert()
 
     private val _trip = MutableStateFlow<TripUi>(TripUi.Idle)
     val trip: StateFlow<TripUi> = _trip.asStateFlow()
@@ -95,6 +96,18 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { z.settings.valhallaUrl.collect { nav.valhallaUrl = it } }
         viewModelScope.launch { z.regions.refresh() }
         viewModelScope.launch { voiceMuted.collect { nav.setMuted(it) } }
+        viewModelScope.launch { z.settings.avoidTolls.collect { nav.avoidTolls = it } }
+        viewModelScope.launch { z.settings.avoidHighways.collect { nav.avoidHighways = it } }
+        viewModelScope.launch { z.settings.avoidFerries.collect { nav.avoidFerries = it } }
+        viewModelScope.launch { z.settings.speedAlert.collect { speedAlert.enabled = it } }
+        // Speeding chime: compares GPS speed with the speed limit of the current road.
+        viewModelScope.launch {
+            z.gnss.location.collect { fix ->
+                val limit = _speedLimit.value
+                val kmh = fix?.takeIf { it.hasSpeed() }?.speed?.times(3.6f)
+                speedAlert.update(System.currentTimeMillis(), if (limit?.unit == "km/h") limit.value else null, kmh)
+            }
+        }
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(z.settings.ttsEngine, z.settings.ttsVoice, z.settings.guidanceLanguage) { e, v, l -> Triple(e, v, l) }
                 .collect { (e, v, l) -> nav.configureVoice(e, v, l) }
@@ -105,7 +118,15 @@ class TripViewModel(app: Application) : AndroidViewModel(app) {
             navState
                 .map { s -> if (s.routeGeometry.size >= 2) s.routeGeometry else null }
                 .distinctUntilChanged() // only when a new route arrives (start / reroute)
-                .collect { g -> z.position.setRoute(g?.map { com.zoomi.core.location.LatLon(it.lat, it.lng) }) }
+                .collect { g ->
+                    val pts = g?.map { com.zoomi.core.location.LatLon(it.lat, it.lng) }
+                    z.position.setRoute(pts)
+                    z.routeTunnels.value = null
+                    if (pts != null && (_trip.value as? TripUi.Navigating)?.mode == com.zoomi.core.nav.TravelMode.CAR) {
+                        z.routeTunnels.value = runCatching { nav.routeTunnels(pts) }
+                            .onFailure { Log.w("Zoomi", "route tunnels failed", it) }.getOrNull()
+                    }
+                }
         }
         viewModelScope.launch {
             navState.collect { s ->

@@ -26,6 +26,8 @@ data class ThemeInputs(
     val speedMps: Float? = null,
     /** Horizontal accuracy of the latest fix (m), null if unknown. */
     val accuracyM: Float? = null,
+    /** While navigating: true if the route puts the vehicle inside a tunnel, false if not, null if unknown. */
+    val routeTunnel: Boolean? = null,
 )
 
 /**

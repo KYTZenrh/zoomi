@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class ImportUi(val running: Boolean = false, val done: Long = 0, val total: Long = 0, val message: String? = null, val error: Boolean = false)
@@ -45,23 +46,28 @@ class RegionsViewModel(app: Application) : AndroidViewModel(app) {
 
     val installed: StateFlow<List<InstalledRegion>> = z.regions.installed
     val progress: StateFlow<Map<String, DownloadProgress>> = downloader.progress
-    val catalogUrl: StateFlow<String> = z.settings.catalogUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val catalogUrl: StateFlow<String> = z.settings.catalogUrl.stateIn(
+        viewModelScope, SharingStarted.Eagerly, com.zoomi.app.data.SettingsRepository.DEFAULT_CATALOG)
 
     private val _catalog = MutableStateFlow(CatalogUi())
     val catalog: StateFlow<CatalogUi> = _catalog.asStateFlow()
 
     init { viewModelScope.launch { z.regions.refresh() } }
 
-    fun setCatalogUrl(url: String) = viewModelScope.launch { z.settings.setCatalogUrl(url) }
+    fun setCatalogUrl(url: String) = viewModelScope.launch {
+        z.settings.setCatalogUrl(url)
+        _catalog.value = CatalogUi()
+        loadCatalog().join()
+    }
 
     fun loadCatalog() = viewModelScope.launch {
-        val url = catalogUrl.value.ifBlank { return@launch }
+        val url = z.settings.catalogUrl.first().ifBlank { return@launch }
         _catalog.value = CatalogUi(loading = true)
         _catalog.value = try {
             val r = downloader.loadCatalog(url)
-            CatalogUi(regions = r, error = if (r.isEmpty()) "The catalog has no valid regions." else null)
+            CatalogUi(regions = r, error = if (r.isEmpty()) "No countries are available yet." else null)
         } catch (e: Exception) {
-            CatalogUi(error = "Couldn't load the catalog: ${e.message}")
+            CatalogUi(error = "Couldn't load the list of countries. Check your internet connection.")
         }
     }
 

@@ -17,7 +17,30 @@ data class BBox(val minLon: Double, val minLat: Double, val maxLon: Double, val 
     fun contains(lat: Double, lon: Double) = lat in minLat..maxLat && lon in minLon..maxLon
 }
 
-data class RegionFile(val name: String, val url: String?, val size: Long?, val sha256: String?)
+/** A border ring as flat lon,lat pairs; [hole] rings cut out of the area (e.g. an enclave). */
+data class AreaRing(val hole: Boolean, val lonLat: DoubleArray) {
+    /** Even-odd ray casting. */
+    fun contains(lat: Double, lon: Double): Boolean {
+        var inside = false
+        val n = lonLat.size / 2
+        var j = n - 1
+        for (i in 0 until n) {
+            val xi = lonLat[2 * i]; val yi = lonLat[2 * i + 1]
+            val xj = lonLat[2 * j]; val yj = lonLat[2 * j + 1]
+            if ((yi > lat) != (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside
+            j = i
+        }
+        return inside
+    }
+    override fun equals(other: Any?) = other is AreaRing && hole == other.hole && lonLat.contentEquals(other.lonLat)
+    override fun hashCode() = 31 * hole.hashCode() + lonLat.contentHashCode()
+}
+
+/** One piece of a file split for hosting (GitHub release assets must be < 2 GiB). */
+data class RegionPart(val url: String, val size: Long)
+
+/** [parts] when present: download them in order into one file; [sha256] is of the joined file. */
+data class RegionFile(val name: String, val url: String?, val size: Long?, val sha256: String?, val parts: List<RegionPart>? = null)
 
 /**
  * A downloadable / installed offline region: one map file (PMTiles, OpenMapTiles schema) and one
@@ -30,7 +53,17 @@ data class RegionManifest(
     val osmDate: String,
     val valhallaVersion: String?,
     val files: List<RegionFile>,
+    /** Continent id for grouping in the list (e.g. "europe"), null if unknown. */
+    val group: String? = null,
+    /** Real border (simplified), when the catalog has it; the bbox alone overlaps neighbours. */
+    val area: List<AreaRing>? = null,
 ) {
+    fun contains(lat: Double, lon: Double): Boolean {
+        if (!bbox.contains(lat, lon)) return false
+        val rings = area ?: return true
+        return rings.any { !it.hole && it.contains(lat, lon) } && rings.none { it.hole && it.contains(lat, lon) }
+    }
+
     val mapFile get() = files.firstOrNull { it.name.endsWith(".pmtiles") }
     val routingFile get() = files.firstOrNull { it.name.endsWith(".tar") }
     val totalSize get() = files.sumOf { it.size ?: 0L }
@@ -51,10 +84,22 @@ object RegionManifests {
             val fo = f as? JsonObject ?: return@mapNotNull null
             fun fs(k: String) = (fo[k] as? JsonPrimitive)?.takeIf { it.isString }?.content
             val name = fs("name")?.takeIf { FILE.matches(it) && it != "region.json" } ?: return@mapNotNull null
-            RegionFile(name, fs("url"), (fo["size"] as? JsonPrimitive)?.longOrNull, fs("sha256")?.lowercase())
+            val parts = (fo["parts"] as? JsonArray)?.mapNotNull { p ->
+                val po = p as? JsonObject ?: return@mapNotNull null
+                val u = (po["url"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return@mapNotNull null
+                val sz = (po["size"] as? JsonPrimitive)?.longOrNull ?: return@mapNotNull null
+                RegionPart(u, sz)
+            }?.takeIf { it.isNotEmpty() }
+            RegionFile(name, fs("url"), (fo["size"] as? JsonPrimitive)?.longOrNull, fs("sha256")?.lowercase(), parts)
         } ?: return null
         if (files.isEmpty()) return null
-        return RegionManifest(id, s("name") ?: id, BBox(b[0], b[1], b[2], b[3]), s("osmDate") ?: "?", s("valhallaVersion"), files)
+        val area = (o["area"] as? JsonArray)?.mapNotNull { r ->
+            val ro = r as? JsonObject ?: return@mapNotNull null
+            val pts = (ro["ring"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.doubleOrNull }?.toDoubleArray() ?: return@mapNotNull null
+            if (pts.size < 6 || pts.size % 2 != 0) return@mapNotNull null
+            AreaRing((ro["hole"] as? JsonPrimitive)?.content == "true", pts)
+        }?.takeIf { rings -> rings.any { !it.hole } }
+        return RegionManifest(id, s("name") ?: id, BBox(b[0], b[1], b[2], b[3]), s("osmDate") ?: "?", s("valhallaVersion"), files, s("group"), area)
     }
 
     fun encode(r: RegionManifest): String = buildJsonObject {
@@ -62,6 +107,12 @@ object RegionManifests {
         put("bbox", buildJsonArray { add(r.bbox.minLon); add(r.bbox.minLat); add(r.bbox.maxLon); add(r.bbox.maxLat) })
         put("osmDate", r.osmDate)
         r.valhallaVersion?.let { put("valhallaVersion", it) }
+        r.group?.let { put("group", it) }
+        r.area?.let { rings ->
+            put("area", buildJsonArray {
+                rings.forEach { ring -> add(buildJsonObject { put("hole", ring.hole); put("ring", buildJsonArray { ring.lonLat.forEach { add(it) } }) }) }
+            })
+        }
         put("files", buildJsonArray {
             r.files.forEach { f ->
                 add(buildJsonObject {
@@ -69,6 +120,7 @@ object RegionManifests {
                     f.url?.let { put("url", it) }
                     f.size?.let { put("size", it) }
                     f.sha256?.let { put("sha256", it) }
+                    f.parts?.let { ps -> put("parts", buildJsonArray { ps.forEach { p -> add(buildJsonObject { put("url", p.url); put("size", p.size) }) } }) }
                 })
             }
         })
@@ -85,6 +137,6 @@ object RegionManifests {
 
     /** The region to use for a set of points: the smallest one containing all of them. */
     fun covering(regions: List<RegionManifest>, points: List<Pair<Double, Double>>): RegionManifest? =
-        regions.filter { r -> points.all { (lat, lon) -> r.bbox.contains(lat, lon) } }
+        regions.filter { r -> points.all { (lat, lon) -> r.contains(lat, lon) } }
             .minByOrNull { (it.bbox.maxLon - it.bbox.minLon) * (it.bbox.maxLat - it.bbox.minLat) }
 }

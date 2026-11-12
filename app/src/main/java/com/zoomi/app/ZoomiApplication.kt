@@ -15,6 +15,9 @@ class ZoomiApplication : Application() {
     val network by lazy { com.zoomi.app.net.NetworkMonitor(this) }
     val navigation by lazy { NavigationController(this, position, regions, network) }
 
+    /** Tunnel stretches of the route being navigated (null when not navigating), for the Auto theme. */
+    val routeTunnels = kotlinx.coroutines.flow.MutableStateFlow<com.zoomi.core.theme.RouteTunnels?>(null)
+
     @Volatile var photonUrl: String = SettingsRepository.DEFAULT_PHOTON
     val photon by lazy { PhotonClient { photonUrl } }
     val transit by lazy { com.zoomi.app.transit.TransitClient() }

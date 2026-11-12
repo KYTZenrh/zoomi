@@ -83,6 +83,7 @@ fun MapScreen(
     onCloseTrip: () -> Unit,
     onToggleMute: () -> Unit,
     onShareEta: () -> Unit,
+    puckColor: com.zoomi.app.map.PuckColor = com.zoomi.app.map.PuckColor.VIOLET,
 ) {
     var userPanned by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -144,6 +145,7 @@ fun MapScreen(
             selectedRoute = selected,
             destination = destination,
             brandColor = MaterialTheme.colorScheme.primary.toArgb(),
+            puckColor = puckColor.argb(dark),
             overviewPaddingBottomPx = bottomPadPx,
             onUserPanned = { userPanned = true },
             onTunnelRoad = onTunnelRoad,
