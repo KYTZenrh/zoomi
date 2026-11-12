@@ -48,7 +48,7 @@ fun VoiceScreen(
             Header("Voice guidance", onBack)
 
             Label("Language")
-            Text("Changes the spoken instructions and the text on screen. Takes effect on the next route.",
+            Text("Applies from the next route.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp))
             GuidanceLanguage.entries.forEach { l ->
@@ -70,8 +70,7 @@ fun VoiceScreen(
 
             Label("Voice")
             Text(
-                "Android doesn't say whether a voice is male or female, so tap Test to hear each one. " +
-                    "Voices marked “download” must be installed in the engine first.",
+                "Tap Test to hear each voice.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )

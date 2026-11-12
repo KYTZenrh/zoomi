@@ -92,17 +92,17 @@ fun SettingsScreen(
             ThemeOption(ThemeMode.DARK, "Dark", "Always dark", mode, onModeChange)
             ThemeOption(
                 ThemeMode.AUTO, "Auto",
-                "Dark from sunset to sunrise at your position, and inside tunnels", mode, onModeChange,
+                "Dark at night and in tunnels", mode, onModeChange,
             )
 
-            Section("Why the theme is what it is now")
+            Section("Theme right now")
             val reason = when (decision.reason) {
                 ThemeReason.USER_LIGHT -> "You chose Light"
                 ThemeReason.USER_DARK -> "You chose Dark"
                 ThemeReason.DAY -> "Daytime at your position"
                 ThemeReason.NIGHT -> "Night-time at your position"
                 ThemeReason.TUNNEL -> "In a tunnel"
-                ThemeReason.SYSTEM_FALLBACK -> "No GPS position yet, following the phone's dark-mode setting"
+                ThemeReason.SYSTEM_FALLBACK -> "No GPS yet, using phone setting"
             }
             Info("Current", (if (decision.dark) "Dark · " else "Light · ") + reason)
             Info("Sun elevation", diagnostics.sunElevationDeg?.let { String.format(Locale.US, "%.1f°", it) } ?: "unknown (no GPS fix)")
@@ -119,14 +119,6 @@ fun SettingsScreen(
                     null -> "unknown (map not following you)"
                 }
             )
-            Text(
-                "Auto switches to dark when the sun is 2° below the horizon and back to light when it is 1° above. " +
-                    "It never switches more than once a minute. Tunnel mode needs the map to show a tunnel where you are, " +
-                    "plus lost GPS or darkness. Light sensor readings alone never switch the theme.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
 
             Section("Satellite view")
             Row(
@@ -134,18 +126,15 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Show satellite imagery with roads and names", modifier = Modifier.weight(1f))
+                Text("Satellite imagery", modifier = Modifier.weight(1f))
                 androidx.compose.material3.Switch(checked = satellite, onCheckedChange = null)
             }
             Text("Imagery source", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
             listOf(
-                "EOX" to ("EOxCloudless (default)" to "Free, no account. About 10 m per pixel: good overview, blurry at street level."),
-                "MAPTILER" to ("MapTiler Satellite (your own free key) · recommended" to "About 1–2 m per pixel in Romania, much sharper than the default. " +
-                    "Free account at maptiler.com, no credit card; 100,000 requests a month, then it pauses until next month (never billed). " +
-                    "Personal / non-commercial use. The key stays on this phone."),
-                "ESRI" to ("Esri World Imagery (your own key)" to "Sharp, often under 1 m. Needs a free ArcGIS Location Platform account and API key " +
-                    "(2 million tiles/month free, billed beyond that: check your account). The key stays on this phone."),
-                "CUSTOM" to ("Custom tile URL" to "Any XYZ imagery you're allowed to use. You're responsible for its terms."),
+                "EOX" to ("EOxCloudless" to "Free, no key · blurry up close"),
+                "MAPTILER" to ("MapTiler · recommended" to "Sharp · free key, never billed"),
+                "ESRI" to ("Esri" to "Sharp · key may bill above 2M tiles/month"),
+                "CUSTOM" to ("Custom" to "Your own tile URL"),
             ).forEach { (id, t) ->
                 Row(
                     Modifier.fillMaxWidth().selectable(imagerySource == id, onClick = { onImagerySource(id) }, role = Role.RadioButton)
@@ -205,25 +194,23 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text("Satellite imagery needs internet; it isn't part of offline regions.",
+            Text("Needs internet. Keys stay on this phone.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
 
             Section("Servers")
             ServerField(
-                label = "Routing server (Valhalla /route URL)",
+                label = "Routing server",
                 value = valhallaUrl,
                 default = com.zoomi.app.data.SettingsRepository.DEFAULT_VALHALLA,
-                note = "Default: FOSSGIS community server, run by volunteers. Max 1 request per second " +
-                    "(Zoomi enforces this). Receives the start and destination of each route you request.",
+                note = "Default: FOSSGIS volunteer server",
                 onSave = onValhallaUrl,
             )
             ServerField(
-                label = "Search server (Photon base URL)",
+                label = "Search server",
                 value = photonUrl,
                 default = com.zoomi.app.data.SettingsRepository.DEFAULT_PHOTON,
-                note = "Default: komoot's public Photon server (fair use). Receives what you type " +
-                    "and your position rounded to about 1 km.",
+                note = "Default: komoot public server",
                 onSave = onPhotonUrl,
             )
 

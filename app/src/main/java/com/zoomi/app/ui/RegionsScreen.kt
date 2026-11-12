@@ -58,9 +58,7 @@ fun RegionsScreen(
         Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             Header("Offline regions", onBack)
             Text(
-                "A region contains the map and the road network for routing. Inside a downloaded region Zoomi " +
-                    "uses it automatically: the map is drawn from it, and when there's no connection, routes and " +
-                    "reroutes are computed on the phone. Search still needs internet.",
+                "Map and routing without internet. Search still needs a connection.",
                 style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
 
@@ -86,8 +84,7 @@ fun RegionsScreen(
             Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(url, { url = it }, label = { Text("Region catalog URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Text(
-                    "Zoomi doesn't host region files yet. They'll be published with the first public release. " +
-                        "Until then, enter the URL of a catalog you host, or import a region folder (see below).",
+                    "No official regions yet. Use your own catalog or import a folder.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -122,8 +119,7 @@ fun RegionsScreen(
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionLabel("Import from a folder")
-            Body("Copy a region folder (region.json, map.pmtiles, routing.tar) to the phone, e.g. into Downloads over USB, " +
-                "then pick that folder here. Zoomi copies the files and checks them; you can delete the copy afterwards.")
+            Body("Pick a region folder copied to the phone.")
             Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (import.running) {
                     if (import.total > 0) {
