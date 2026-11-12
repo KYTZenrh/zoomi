@@ -1,0 +1,125 @@
+# Builds offline map regions (map + routing) from Geofabrik OSM extracts and publishes them as
+# assets of the "regions" release, plus catalog.json that the app reads.
+# Run it from the Actions tab: choose a continent (and optionally a comma list of country ids).
+name: Build offline regions
+
+on:
+  workflow_dispatch:
+    inputs:
+      continent:
+        description: "Geofabrik continent id (europe, asia, africa, north-america, south-america, central-america, australia-oceania, russia)"
+        required: true
+        default: europe
+      only:
+        description: "Optional comma-separated Geofabrik ids (e.g. romania,moldova). Empty = every country of the continent"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  PLANETILER_VERSION: "0.10.2"
+  PLANETILER_SHA256: "f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d"
+  VALHALLA_WHEEL: "https://files.pythonhosted.org/packages/df/47/22bf3a1dcc911bc149b854892812e04f42e30c8c34ade8320141b1f3ba32/pyvalhalla-3.9.1-cp312-abi3-manylinux_2_28_x86_64.whl"
+  VALHALLA_WHEEL_SHA256: "7b49c5e5f86cefd555b473aaaf34df3305889d30aa889b8abd3b4c2acc622271"
+  VALHALLA_VERSION: "3.9.1"
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - id: pick
+        run: echo "matrix=$(python3 data-pipeline/pick_regions.py '${{ inputs.continent }}' '${{ inputs.only }}')" >> "$GITHUB_OUTPUT"
+      - name: Make sure the regions release exists
+        run: |
+          gh release view regions >/dev/null 2>&1 || gh release create regions --latest=false \
+            --title "Offline map regions" \
+            --notes "Offline map + routing packages for Zoomi, built from OpenStreetMap (Geofabrik extracts). Download them from inside the app (Settings → Offline maps). Data © OpenStreetMap contributors, ODbL 1.0; map schema OpenMapTiles (CC-BY 4.0)."
+      # Natural Earth, OSM water polygons and lake centerlines: download once, share with every build job.
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: data/sources
+          key: planetiler-sources-${{ env.PLANETILER_VERSION }}-${{ github.run_id }}
+          restore-keys: planetiler-sources-${{ env.PLANETILER_VERSION }}-
+      - name: Download Planetiler and its sources
+        run: |
+          curl -fsSL -o planetiler.jar "https://github.com/onthegomap/planetiler/releases/download/v${PLANETILER_VERSION}/planetiler.jar"
+          echo "${PLANETILER_SHA256}  planetiler.jar" | sha256sum -c -
+          java -jar planetiler.jar --download --only-download --area=monaco
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/sources
+          key: planetiler-sources-${{ env.PLANETILER_VERSION }}-${{ github.run_id }}
+          restore-keys: planetiler-sources-${{ env.PLANETILER_VERSION }}-
+      - name: Tools
+        run: |
+          curl -fsSL -o planetiler.jar "https://github.com/onthegomap/planetiler/releases/download/v${PLANETILER_VERSION}/planetiler.jar"
+          echo "${PLANETILER_SHA256}  planetiler.jar" | sha256sum -c -
+          curl -fsSL -o pyvalhalla-3.9.1-cp312-abi3-manylinux_2_28_x86_64.whl "$VALHALLA_WHEEL"
+          echo "${VALHALLA_WHEEL_SHA256}  pyvalhalla-3.9.1-cp312-abi3-manylinux_2_28_x86_64.whl" | sha256sum -c -
+          pip install --no-deps ./pyvalhalla-3.9.1-cp312-abi3-manylinux_2_28_x86_64.whl
+      - name: OSM extract
+        run: |
+          curl -fsSL -A "zoomi-region-builder (+https://github.com/${{ github.repository }})" -o region.osm.pbf "${{ matrix.pbf }}"
+          curl -fsSL -A "zoomi-region-builder" "${{ matrix.pbf }}.md5" | awk '{print $1"  region.osm.pbf"}' | md5sum -c -
+          date -u -d "$(curl -fsSI '${{ matrix.pbf }}' | grep -i '^last-modified:' | cut -d' ' -f2- | tr -d '\r')" +%F > osm-date.txt
+          ls -l region.osm.pbf; cat osm-date.txt
+      - name: Map tiles (Planetiler, OpenMapTiles schema)
+        run: java -Xmx10g -jar planetiler.jar --osm-path=region.osm.pbf --output=map.pmtiles --storage=mmap --nodemap-type=sparsearray --force
+      - name: Routing tiles (Valhalla)
+        run: |
+          mkdir -p tiles
+          valhalla_build_config --mjolnir-tile-dir tiles --mjolnir-tile-extract routing.tar \
+            --mjolnir-admin tiles/admins.sqlite --mjolnir-timezone tiles/timezones.sqlite > valhalla.json
+          valhalla_build_admins -c valhalla.json region.osm.pbf
+          valhalla_build_tiles -c valhalla.json region.osm.pbf
+          valhalla_build_extract -c valhalla.json -v
+          rm -rf tiles region.osm.pbf
+      - name: Package and upload
+        run: |
+          python data-pipeline/release_region.py --id "${{ matrix.id }}" --name "${{ matrix.name }}" --group "${{ matrix.group }}" \
+            --osm-date "$(cat osm-date.txt)" --map map.pmtiles --routing routing.tar --valhalla-version "$VALHALLA_VERSION" \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/regions" --out out
+          ls -l out
+          gh release upload regions out/* --clobber
+
+  catalog:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    concurrency: regions-catalog
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebuild catalog.json from every region in the release
+        run: |
+          mkdir cat
+          gh release download regions -p '*.region.json' -D cat
+          python3 data-pipeline/merge_catalog.py cat catalog.json
+          gh release upload regions catalog.json --clobber
